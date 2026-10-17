@@ -29,6 +29,9 @@ class Kakao(Notifier):
             lines.append(msg.body)
         lines += [f"• {it['title']}" for it in msg.items]
         text = "\n".join(lines)
+        overflow = next((ln for ln in msg.footer.splitlines() if ln.startswith("외 ")), "")
+        if overflow:  # keep "외 N건" visible even when the list gets truncated
+            text = text[: TEXT_LIMIT - len(overflow) - 2] + "\n" + overflow
         if len(text) > TEXT_LIMIT:
             text = text[: TEXT_LIMIT - 1] + "…"
         link = self.fmt.get("feed_url") or ""

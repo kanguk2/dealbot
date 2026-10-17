@@ -46,13 +46,16 @@ jobs:
           DEALBOT_TELEGRAM_CHAT_ID: ${{ secrets.DEALBOT_TELEGRAM_CHAT_ID }}
           DEALBOT_NTFY_TOPIC: ${{ secrets.DEALBOT_NTFY_TOPIC }}
           DEALBOT_NTFY_TOKEN: ${{ secrets.DEALBOT_NTFY_TOKEN }}
+          DEALBOT_NTFY_SERVER: ${{ secrets.DEALBOT_NTFY_SERVER }}
           DEALBOT_PUSHOVER_TOKEN: ${{ secrets.DEALBOT_PUSHOVER_TOKEN }}
           DEALBOT_PUSHOVER_USER: ${{ secrets.DEALBOT_PUSHOVER_USER }}
           DEALBOT_KAKAO_REST_KEY: ${{ secrets.DEALBOT_KAKAO_REST_KEY }}
           DEALBOT_KAKAO_REFRESH_TOKEN: ${{ secrets.DEALBOT_KAKAO_REFRESH_TOKEN }}
+          DEALBOT_KAKAO_CLIENT_SECRET: ${{ secrets.DEALBOT_KAKAO_CLIENT_SECRET }}
           DEALBOT_SMTP_HOST: ${{ secrets.DEALBOT_SMTP_HOST }}
           DEALBOT_SMTP_USER: ${{ secrets.DEALBOT_SMTP_USER }}
           DEALBOT_SMTP_PASS: ${{ secrets.DEALBOT_SMTP_PASS }}
+          DEALBOT_SMTP_PORT: ${{ secrets.DEALBOT_SMTP_PORT }}
           DEALBOT_EMAIL_TO: ${{ secrets.DEALBOT_EMAIL_TO }}
 
       - name: Commit data/
