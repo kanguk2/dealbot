@@ -1,6 +1,75 @@
 {
   "runs": [
     {
+      "at": "2026-10-18T00:39:07+09:00",
+      "found": 15,
+      "new": 6,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "수동 점검 실행 (Codex 검색 없이)"
+        }
+      ],
+      "by_source": {
+        "rss:ppomppu_coupon": 15
+      },
+      "dropped": {
+        "no_keyword": 9
+      },
+      "drop_samples": [
+        {
+          "title": "[KB스타뱅킹] 한국사 퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 슬기로운 금융생활 OX퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 축구 play 퀴즈 HANA 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[Hpoint] 퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 261018 토스 두근두근 1등 찍기 팀플전",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] OX 퀴즈 10/18 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[신한쏠] 야구상식 쏠퀴즈 10/18일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 클립 챌린지, 보험, 결장결제 등 8원 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 마이카 아이나비 랜덤포",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-17T14:11:26+09:00",
       "found": 0,
       "new": 0,
