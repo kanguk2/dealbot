@@ -114,6 +114,8 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - **설정 화면에 GitHub 연결란 없음**: 사용자 요청. 저장소는 URL에서 알아내고, PAT는 처음 저장할 때 대화상자로 한 번 받는다. 공개 Pages라서 토큰을 페이지에 넣을 수 없다.
 - **피드 자동 갱신**: 3분마다, 그리고 탭에 돌아올 때 runs.json을 확인한다.
 - **가이드 탭**: `docs/guide.html`이 MANUAL.md를 렌더링한다. 외부 라이브러리 없이 `app.js`의 작은 마크다운 렌더러를 쓴다. MANUAL.md에 새 문법(중첩 표, 이미지 등)을 쓰면 렌더러와 테스트도 같이 고친다.
+- **정기 실행 = GitHub Actions + codex-action**: Codex cloud 예약 작업은 main에 무인 push를 못 한다(2026-10 조사). `dealbot.yml`은 job 3개(search → collect → learn)다. codex-action은 drop-sudo 때문에 job당 1번만 실행된다. 웹 검색은 `codex-args: ["-c", "web_search=\"live\""]`로 켠다(`--search`는 exec 옵션이 아니라 실패한다). 하루 1회 09:00 KST(사용자 요청), 그래서 기본 카테고리 priority는 instant다.
+- **OPENAI_API_KEY는 Secrets**에 둔다. Variables는 마스킹되지 않아 공개 로그에 노출된다.
 - **Pages 소스**: 사용자가 `main` / 루트로 켰다. 루트 `index.html`이 `docs/`로 넘겨 준다. `/docs` 소스로 바꿔도 동작한다.
 - **게임 카테고리 제외**: 사용자 요청(2026-10-17). 기본 카테고리는 `points`(포인트·적립) 하나다. `epic_free.py`는 선택 소스로 남겨 두었다.
 - 뽐뿌 이벤트 게시판 RSS가 2024년 이후 갱신되지 않아 `ppomppu_coupon`(쿠폰 게시판)으로 바꿨다. `ppomppu_hotdeal`, `ruliweb_hotdeal`은 등록만 해 두었다.
@@ -137,5 +139,6 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - 2026-10-17 · claude/m1-scaffold · PR #1 · M1 뼈대 전체 구현, 게임 카테고리 제외, CLAUDE.md 작성 · Python 파이프라인·ntfy 실전송·UI 렌더링 확인, 다른 채널 실전송은 미검증
 - 2026-10-17 · claude/m1-scaffold · PR #1 · manual-writer 서브에이전트로 MANUAL.md 첫 작성. 서브에이전트가 찾은 문제 수정(ntfy·Pushover·카카오 "외 N건" 누락, 워크플로 env 3개 누락, README 미리보기에 filters.py 누락) · 35건 메시지로 넘침 문구 확인
 - 2026-10-17 · claude/m1-scaffold · PR #1 · 설정에서 GitHub 연결란 제거(첫 저장 때 토큰 대화상자), 피드 실행마다 교체·자동 갱신, 마감 필터(min_days_left), 검색 플레이북 자기개선(review_run.py), 가이드 탭, 테스트 스위트(Python 52·JS 10)와 tests.yml · 뮤테이션 확인으로 테스트가 실제로 잡는 것 확인
+- 2026-10-17 · main · 기본 화면 대표/관심 딜 + 모아보기(links.json), ☆ 관심(interests.json) 학습, GitHub Actions `dealbot.yml`(Codex 검색·학습) + `health.yml`, 하루 1회 · test-runner: Python 74·JS 33. 실제 실행 2회: 첫 번째에서 `--search` 오류와 job당 1회 제한을 찾아 job 3개로 분리했다. 두 번째는 흐름은 정상이었지만 OpenAI API `Quota exceeded`(결제·크레딧 필요)로 검색이 안 됐다
 - 2026-10-17 · main · PR 없이 main 직접 push로 전환, test-runner 서브에이전트 추가 · 사용자 요청
 - 2026-10-17 · main · UI를 Flight Watch(gagulproject.github.io/flight-price-tracker) 스타일로 재디자인(히어로 통계, 딜 찾기 패널, 카드 그리드, 실행 기록 차트), 무시가 대기 중 묶음 알림에 반영 안 되던 버그 수정, 더 보기 hidden 버그 수정 · test-runner: Python 53·JS 18 통과, 500/1280px 화면 확인. 샀음 표시는 묶음 알림을 막지 않는다(무시만 막음)
