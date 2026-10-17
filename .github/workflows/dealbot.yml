@@ -1,5 +1,12 @@
-# DealBot scheduled run (Codex cloud Automation cannot push to main unattended, so Actions runs it).
+# DealBot fallback / API-key runner.
 #
+# Main path (ChatGPT subscription): a Codex desktop-app scheduled task on the user's PC runs
+# CODEX.md at 09:00 KST (.github/codex/scheduled.md) and pushes "codex: run ..."; notify.yml then
+# sends the notifications. This workflow runs at 10:00 KST and does nothing if a run already
+# happened today (PC was on). If not, it collects the script sources (RSS/Epic) so the day is
+# not lost. With an OPENAI_API_KEY secret (API billing) it also runs Codex here:
+#
+#   job gate     skip everything when a run already happened today (scheduled runs only)
 #   job search   Codex web search (CODEX.md step 2)          -> artifact search.json  [needs OPENAI_API_KEY]
 #   job collect  sources + dedupe + filter + validate + notify + review (steps 3-5)
 #                -> commit data/ and push; artifact review.json
@@ -12,7 +19,7 @@ name: dealbot
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # once a day, 09:00 KST (UTC+9). Keep in sync with config.schedule.times
+    - cron: "0 1 * * *"   # 10:00 KST: one hour after the Codex app task (config.schedule.times 09:00)
   workflow_dispatch:
     inputs:
       search:
@@ -31,7 +38,29 @@ env:
   USE_CODEX: ${{ secrets.OPENAI_API_KEY != '' && (github.event_name == 'schedule' || inputs.search) }}
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - id: check
+        run: |
+          ran=$(python3 scripts/ran_today.py)
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$ran" = "yes" ]; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "오늘 이미 실행됨(Codex 앱) - 건너뜀" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
   search:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -77,8 +106,8 @@ jobs:
           retention-days: 7
 
   collect:
-    needs: search
-    if: always()
+    needs: [gate, search]
+    if: always() && needs.gate.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
