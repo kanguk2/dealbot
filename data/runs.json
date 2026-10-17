@@ -9,6 +9,10 @@
         {
           "source": "search",
           "error": "수동 점검 실행 (Codex 검색 없이)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
         }
       ],
       "by_source": {
@@ -67,7 +71,10 @@
       "user_feedback": {
         "ignored": [],
         "bought": []
-      }
+      },
+      "alerts": [
+        "source_fail:search"
+      ]
     },
     {
       "at": "2026-10-17T14:11:26+09:00",
