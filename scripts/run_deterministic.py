@@ -2,6 +2,7 @@
 
 Runs every script-backed source used by an enabled category, merges extra candidate
 files (Codex's web-search results), and records the run in data/runs.json.
+The page feed (feed.items) is replaced by this run's new deals every time; see replace_feed.
 It does not validate, notify or commit; those are separate steps.
 
 Usage:
@@ -12,13 +13,41 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import sys
 from collections import Counter
+from datetime import timedelta
 
 import common
 import dedupe
 import filters
 from sources import enabled_sources, fetch_source
+
+BOUGHT_LIMIT = 200
+PENDING_DAYS = 22  # longest notify window (weekly: up to 21 days back) + 1
+FEEDBACK_LIMIT = 20
+SAMPLE_LIMIT = 10
+
+# filters/dedupe reason text -> stable code for runs.json "dropped" (read by review_run.py)
+REASON_CODES = (("exclude word", "exclude"), ("no keyword", "no_keyword"), ("discount", "low_discount"),
+                ("price", "over_price"), ("ended", "ended"), ("less than", "too_close"),
+                ("unknown or disabled category", "bad_category"), ("unknown category", "bad_category"),
+                ("title missing", "invalid"), ("bad url", "invalid"))
+
+
+def reason_code(why: str) -> str:
+    return next((code for text, code in REASON_CODES if text in why), "other")
+
+
+def drop_report(candidates: list[dict], new: list[dict], rejected: list, dropped: list) -> tuple[dict, list]:
+    """Counts per drop reason plus a few examples, search results first (they teach the playbook)."""
+    counts = Counter(reason_code(why) for _, why in rejected + dropped)
+    seen_dupes = len(candidates) - len(new) - len(rejected)
+    if seen_dupes:
+        counts["already_seen"] = seen_dupes
+    samples = sorted(rejected + dropped, key=lambda x: (x[0].get("source") or "search") != "search")
+    return dict(counts), [{"title": (it.get("title") or "")[:80], "source": it.get("source") or "search",
+                           "reason": why[:80]} for it, why in samples[:SAMPLE_LIMIT]]
 
 
 def collect(config: dict, since) -> tuple[list[dict], list[dict]]:
@@ -34,19 +63,52 @@ def collect(config: dict, since) -> tuple[list[dict], list[dict]]:
     return items, errors
 
 
+def empty_feed() -> dict:
+    return {"run_at": None, "items": [], "pending": [], "bought": []}
+
+
+def load_feed() -> dict:
+    return {**empty_feed(), **common.load_data("feed", empty_feed())}
+
+
+def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int) -> dict:
+    """The page shows only this run's results; earlier ones are dropped.
+    Returns what the user marked on the replaced page (feedback for review_run.py).
+
+    - items:   replaced by this run's new deals
+    - pending: notification queue, so daily/weekly digests survive the replacement
+    - bought:  deals marked 샀음 on the page are kept for the monthly stats
+    """
+    feedback = {s: [{"title": it["title"][:80], "source": it["source"], "url": it["url"]}
+                    for it in feed["items"] if it.get("status") == s][:FEEDBACK_LIMIT]
+                for s in ("ignored", "bought")}
+    known = {b["id"] for b in feed["bought"]}
+    carried = [it for it in feed["items"] if it.get("status") == "bought" and it["id"] not in known]
+    feed["bought"] = (carried + feed["bought"])[:BOUGHT_LIMIT]
+    feed["items"] = added[:feed_limit]
+    feed["run_at"] = run_at.isoformat()
+    cutoff = run_at - timedelta(days=PENDING_DAYS)
+    kept = [p for p in feed["pending"]
+            if (common.parse_dt(p.get("found_at")) or run_at) >= cutoff]
+    feed["pending"] = [copy.deepcopy(it) for it in added] + kept
+    return feedback
+
+
 def ingest(new_items: list[dict], config: dict, run_at, run_errors: list[dict],
-           found: int, by_source: dict) -> dict:
-    """Prepend items to feed, remember keys, append the run record. Returns the run."""
-    feed = common.load_data("feed", {"items": []})
+           found: int, by_source: dict, dropped: dict | None = None,
+           drop_samples: list | None = None) -> dict:
+    """Replace the feed with this run, remember keys, append the run record. Returns the run."""
+    feed = load_feed()
     seen = common.load_data("seen", {"keys": {}})
     runs = common.load_data("runs", {"runs": []})
     stamp = run_at.isoformat()
     added = [{**it, "found_at": stamp, "notified": [], "status": "new"} for it in new_items]
-    feed["items"] = (added + feed.get("items", []))[: config.get("feed_limit", 500)]
+    feedback = replace_feed(feed, added, run_at, config.get("feed_limit", 500))
     dedupe.prune(seen, config.get("seen_ttl_days", 30), run_at.date())
     dedupe.remember(seen, added, run_at.date())
     run = {"at": stamp, "found": found, "new": len(added), "notified": 0,
-           "errors": run_errors, "by_source": by_source}
+           "errors": run_errors, "by_source": by_source,
+           "dropped": dropped or {}, "drop_samples": drop_samples or [], "user_feedback": feedback}
     runs["runs"] = ([run] + runs.get("runs", []))[: common.RUNS_LIMIT]
     common.save_data("feed", feed)
     common.save_data("seen", seen)
@@ -82,17 +144,18 @@ def main() -> int:
     by_source = dict(Counter(c.get("source") or "search" for c in candidates))
     seen = common.load_data("seen", {"keys": {}})
     new, rejected = dedupe.dedupe(candidates, config, seen)
-    for title, reason in rejected:
-        print(f"dedupe: skipped {title!r}: {reason}", file=sys.stderr)
+    for raw, reason in rejected:
+        print(f"dedupe: skipped {raw.get('title')!r}: {reason}", file=sys.stderr)
     kept, dropped = filters.apply(new, config, run_at.date())
-    for title, why in dropped:
-        print(f"filter: dropped {title!r}: {why}", file=sys.stderr)
+    for it, why in dropped:
+        print(f"filter: dropped {it.get('title')!r}: {why}", file=sys.stderr)
+    drop_counts, drop_samples = drop_report(candidates, new, rejected, dropped)
 
     if args.dry_run:
         common.dump({"found": len(candidates), "new": kept, "errors": errors,
-                     "by_source": by_source})
+                     "by_source": by_source, "dropped": drop_counts, "drop_samples": drop_samples})
         return 0
-    run = ingest(kept, config, run_at, errors, len(candidates), by_source)
+    run = ingest(kept, config, run_at, errors, len(candidates), by_source, drop_counts, drop_samples)
     print(f"run {run['at']}: found {run['found']}, new {run['new']}, "
           f"errors {len(run['errors'])}")
     return 0

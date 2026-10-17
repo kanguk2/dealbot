@@ -3,7 +3,7 @@
   "$id": "config.schema.json",
   "title": "DealBot config",
   "type": "object",
-  "required": ["version", "schedule", "categories", "rss_feeds", "search_hints", "quiet_hours", "feed_limit", "seen_ttl_days"],
+  "required": ["version", "schedule", "categories", "rss_feeds", "search_hints", "quiet_hours", "min_days_left", "feed_limit", "seen_ttl_days"],
   "additionalProperties": false,
   "properties": {
     "version": { "enum": [1] },
@@ -46,6 +46,7 @@
       "additionalProperties": false,
       "properties": { "start": { "$ref": "#/$defs/hm" }, "end": { "$ref": "#/$defs/hm" } }
     },
+    "min_days_left": { "type": "integer", "minimum": 0, "maximum": 365 },
     "feed_limit": { "type": "integer", "minimum": 10, "maximum": 5000 },
     "seen_ttl_days": { "type": "integer", "minimum": 1, "maximum": 365 }
   },

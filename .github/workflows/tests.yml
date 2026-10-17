@@ -1,0 +1,33 @@
+# Runs the test suite on code changes. Bot commits that only touch data/ are skipped.
+name: tests
+
+on:
+  push:
+    paths-ignore: ["data/**"]
+  pull_request:
+    paths-ignore: ["data/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt
+      - name: Python tests
+        run: python -m unittest discover -s tests -v
+      - name: UI tests
+        run: node --test tests/js/app.test.mjs
+      - name: Committed data is valid
+        run: python scripts/validate.py

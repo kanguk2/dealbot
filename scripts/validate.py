@@ -1,4 +1,4 @@
-"""Validate data/*.json before committing: JSON Schema, cross references, no secrets.
+"""Validate data/ before committing: JSON Schema, cross references, no secrets, playbook shape.
 
 Usage: python scripts/validate.py [--quiet]
 Exit code 0 = OK, 1 = problems (printed one per line).
@@ -96,7 +96,19 @@ def validate() -> list[str]:
         problems += schema_problems(name, data[name])
         problems += secret_problems(name, data[name])
     problems += cross_problems(data)
+    problems += playbook_check()
     return problems
+
+
+def playbook_check() -> list[str]:
+    """data/playbook.md is edited by Codex every run: keep its shape, size and no secrets."""
+    from review_run import PLAYBOOK, playbook_problems
+    path = common.DATA / PLAYBOOK
+    text = path.read_text(encoding="utf-8") if path.exists() else None
+    out = playbook_problems(text)
+    if text and SECRET_VALUE.search(text):
+        out.append("playbook: looks like it contains a credential")
+    return out
 
 
 def main() -> int:

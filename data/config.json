@@ -43,6 +43,7 @@
     "start": "23:00",
     "end": "08:00"
   },
+  "min_days_left": 1,
   "feed_limit": 500,
   "seen_ttl_days": 30
 }

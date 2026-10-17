@@ -10,7 +10,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data"
+# DEALBOT_DATA_DIR lets tests run against a scratch copy instead of data/.
+DATA = Path(os.environ.get("DEALBOT_DATA_DIR") or ROOT / "data")
 SCHEMAS = ROOT / "schemas"
 
 USER_AGENT = "dealbot/1.0 (personal)"
@@ -134,6 +135,12 @@ def http_request(method: str, url: str, *, json_body=None, data: bytes | None = 
         from urllib.parse import urlencode
         data = urlencode(form).encode("utf-8")
         hdrs.setdefault("Content-Type", "application/x-www-form-urlencoded")
+    log = os.environ.get("DEALBOT_HTTP_LOG")
+    if log:  # tests: record the request instead of sending it
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"method": method, "url": url, "json": json_body, "form": form},
+                               ensure_ascii=False) + "\n")
+        return b"{}"
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
