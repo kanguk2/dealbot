@@ -5,7 +5,8 @@
 - 설계 원본: [`SPEC.md`](SPEC.md). 사용자가 작성했고 역할 분담, 스키마, 실행 흐름, 마일스톤이 들어 있다.
 - 사용자용 설치·운영 문서: [`README.md`](README.md)
 - Codex Automation 실행 지침: [`CODEX.md`](CODEX.md). Codex가 매 실행마다 읽는다.
-- 사용 설명서: [`MANUAL.md`](MANUAL.md). 상황별 사용법이다. `manual-writer` 서브에이전트만 고친다(2절 5번).
+- 사용 설명서: [`MANUAL.md`](MANUAL.md). 상황별 사용법이다. `manual-writer` 서브에이전트만 고친다(2절 4번).
+- 서브에이전트: `.claude/agents/manual-writer.md`(설명서), `.claude/agents/test-runner.md`(테스트)
 
 ## 1. 역할 경계 (가장 중요)
 
@@ -21,26 +22,17 @@
 
 ## 2. Git 작업 규칙
 
-사용자 요청(2026-10-17): **모든 기능 추가와 수정은 커밋하고 푸시한다.** 로컬에만 남겨 두지 않는다.
+사용자 요청(2026-10-17): **모든 기능 추가와 수정은 커밋하고 바로 `main`에 push한다. 브랜치와 PR은 만들지 않는다.** 로컬에만 남겨 두지 않는다.
 
-1. 시작할 때 실행한다.
-   ```bash
-   git checkout main && git pull
-   git checkout -b claude/<짧은-주제>     # 예: claude/m4-search-toggle
-   ```
+1. 시작할 때: `git checkout main && git pull --rebase` (Codex와 웹 UI가 `main`에 수시로 커밋한다).
 2. 의미 단위로 커밋한다. 메시지는 `<type>: <요약>` 형식으로 쓴다. type은 `feat`, `fix`, `docs`, `refactor`, `chore`, `test` 중 하나다. 본문에 무엇을, 왜 바꿨는지 적는다. 마지막 줄에는 세션이 지정하는 `Co-Authored-By` 트레일러를 넣는다.
    - `codex: ...`(Codex 실행), `ui: ...`(웹 UI 저장), `actions: ...`(백업 워크플로) 접두어는 봇 전용이다. Claude는 쓰지 않는다.
-3. 커밋 전에 `python scripts/validate.py`를 통과시키고, 아래 4절의 해당 테스트를 돌린다.
-4. `git push -u origin claude/<주제>` 후 PR을 연다. 본문에는 다음을 적는다.
-   - 무엇을 바꿨는지
-   - 스펙과 다른 점이 있으면 그 이유
-   - 어떻게 검증했는지, 그리고 **검증하지 못한 것**
-   - 머지 후 사용자가 해야 할 일
-   - 세션이 지정하는 PR 서명
-5. 사용자에게 보이는 동작이 바뀌었으면 PR 전에 **`manual-writer` 서브에이전트**를 실행한다(`.claude/agents/manual-writer.md`). 바뀐 동작에는 UI, 설정 항목, 알림 규칙, 채널, 소스, Codex 실행 방식, 설치 절차가 포함된다. 프롬프트에 무엇이 바뀌었는지 적어 준다. 서브에이전트가 `MANUAL.md`를 갱신하면 그 결과를 같은 PR에 커밋한다. 설명서를 메인 세션에서 직접 쓰지 않는다. 에이전트 정의가 목록에 보이지 않으면 general-purpose 에이전트에게 "`.claude/agents/manual-writer.md`를 읽고 그 지침대로 수행하라"고 시킨다.
-6. 작업이 끝나면 맨 아래 **작업 로그**에 한 줄을 추가하고 같은 PR에 커밋한다.
-7. 사용자가 "main에 바로"라고 하면 브랜치 없이 main에 커밋·푸시해도 된다. 그때도 push 전에 `git pull --rebase`를 한다(Codex 커밋과 섞이기 때문).
-8. force push, 히스토리 재작성, `data/` 운영 데이터 되돌리기는 사용자에게 먼저 묻는다.
+3. **테스트는 `test-runner` 서브에이전트에게 맡긴다**(`.claude/agents/test-runner.md`). 사용자 요청(2026-10-17)이다. 코드를 바꾸면 커밋 전에 바뀐 동작을 프롬프트에 적어 실행한다. 서브에이전트가 테스트를 추가·수정하고, 전체 스위트와 뮤테이션 확인, 필요하면 화면 확인까지 돌려 보고한다. 실패나 버그 보고가 오면 메인 세션이 고치고 다시 맡긴다. 테스트 파일 변경도 같은 커밋에 넣는다.
+4. 사용자에게 보이는 동작이 바뀌었으면 **`manual-writer` 서브에이전트**를 실행한다(`.claude/agents/manual-writer.md`). 바뀐 동작에는 UI, 설정 항목, 알림 규칙, 채널, 소스, Codex 실행 방식, 설치 절차가 포함된다. 서브에이전트가 `MANUAL.md`를 갱신하면 커밋한다. 설명서를 메인 세션에서 직접 쓰지 않는다. 두 서브에이전트는 독립적이라 병렬로 실행해도 된다.
+   - 에이전트 정의가 목록에 보이지 않으면 general-purpose 에이전트에게 "`.claude/agents/<name>.md`를 읽고 그 지침대로 수행하라"고 시킨다.
+5. push 전에 `git pull --rebase`를 한 번 더 하고, `git push origin main`을 실행한다. 거절되면 다시 rebase한 뒤 push한다.
+6. 작업이 끝나면 맨 아래 **작업 로그**에 한 줄을 추가해 같이 커밋한다.
+7. force push, 히스토리 재작성, `data/` 운영 데이터 되돌리기는 사용자에게 먼저 묻는다.
 
 ### 이 PC 환경 메모 (Windows)
 
@@ -49,7 +41,7 @@
   py -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
   ```
   `.venv/`는 gitignore돼 있다.
-- `gh` CLI가 없다. PR은 GitHub REST API로 연다. 토큰은 `git credential fill`(host=github.com)로 얻고, 출력하거나 파일에 쓰지 않는다. 그게 안 되면 `https://github.com/kanguk2/dealbot/compare/main...<branch>` 링크를 사용자에게 준다.
+- `gh` CLI가 없다. GitHub API가 필요하면(Pages 상태 확인 등) 토큰을 `git credential fill`(host=github.com)로 얻고, 출력하거나 파일에 쓰지 않는다.
 - 로컬 git 계정은 `kevinkanguk`(협업자 권한)이고, 저장소 소유자는 `kanguk2`다.
 - `core.autocrlf=true` 환경이다. `.gitattributes`(`eol=lf`)가 있으니 줄바꿈은 신경 쓰지 않아도 된다.
 - 셸 heredoc 안에 따옴표가 많은 긴 파일을 넣으면 깨진다. 파일은 Write 도구로 만든다.
@@ -79,7 +71,7 @@
 
 ## 4. 테스트 방법
 
-**자동 테스트가 기본이다.** 기능을 추가하거나 고치면 테스트도 같이 추가하고, 커밋 전에 전부 돌린다. 사용자 요청(2026-10-17): "말한 것들이 제대로 동작하는지 테스트를 작성하고 돌린다."
+**자동 테스트가 기본이다.** 기능을 추가하거나 고치면 테스트도 같이 추가하고, 커밋 전에 전부 돌린다. 실행은 `test-runner` 서브에이전트가 맡는다(2절 3번). 아래는 그 서브에이전트와 사람이 쓰는 명령이다. 사용자 요청(2026-10-17): "말한 것들이 제대로 동작하는지 테스트를 작성하고 돌린다."
 
 ```bash
 python -m unittest discover -s tests        # Python 52+개 (단위 + data 임시 폴더 end-to-end)
@@ -111,7 +103,7 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 ## 5. 현재 상태와 결정 이력
 
 ### 완료
-- **M1 뼈대** (PR #1, 브랜치 `claude/m1-scaffold`): 스키마 5종, 스크립트, 소스 2종, 알림 7종, Pages UI, CODEX.md, README, 백업 워크플로
+- **M1 뼈대** (PR #1 머지됨. 이후로는 main 직접 push): 스키마 5종, 스크립트, 소스 2종, 알림 7종, Pages UI, CODEX.md, README, 백업 워크플로
 
 ### 스펙과 다르게 정한 것 (이유 포함)
 - **피드는 실행마다 통째로 교체**: 사용자 선택(2026-10-17). `feed.items`는 최신 실행의 새 딜만 담는다. 묶음 알림은 `feed.pending` 대기열, 샀음 기록은 `feed.bought`(200건)로 남긴다. 이전 페이지의 무시·샀음은 `runs[0].user_feedback`로 넘어가 검색 학습에 쓰인다.
