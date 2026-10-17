@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "runs.schema.json",
+  "title": "DealBot run log (newest first, max 50)",
+  "type": "object",
+  "required": ["runs"],
+  "additionalProperties": false,
+  "properties": {
+    "runs": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["at", "found", "new", "notified", "errors", "by_source"],
+        "additionalProperties": false,
+        "properties": {
+          "at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}" },
+          "found": { "type": "integer", "minimum": 0 },
+          "new": { "type": "integer", "minimum": 0 },
+          "notified": { "type": "integer", "minimum": 0 },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source", "error"],
+              "additionalProperties": false,
+              "properties": { "source": { "type": "string" }, "error": { "type": ["string", "null"] } }
+            }
+          },
+          "by_source": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+          "alerts": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

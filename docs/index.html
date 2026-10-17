@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>딜봇 피드</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body data-page="feed">
+  <header>
+    <h1>딜봇</h1>
+    <nav><a href="./" aria-current="page">피드</a><a href="settings.html">설정</a></nav>
+  </header>
+  <main>
+    <div id="banner" class="banner" hidden></div>
+    <p id="run" class="muted">불러오는 중…</p>
+    <p id="stats" class="muted"></p>
+    <div class="toolbar">
+      <div id="cats" class="tabs"></div>
+      <div class="row">
+        <select id="status" aria-label="상태">
+          <option value="active">새 딜·본 것</option>
+          <option value="bought">샀음</option>
+          <option value="ignored">무시</option>
+          <option value="all">전체</option>
+        </select>
+        <span id="count" class="muted"></span>
+      </div>
+    </div>
+    <div id="list"></div>
+    <button id="more" class="more" hidden>더 보기</button>
+  </main>
+</body>
+</html>

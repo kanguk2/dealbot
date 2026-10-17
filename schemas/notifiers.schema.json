@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "notifiers.schema.json",
+  "title": "DealBot notification channels (no secrets: tokens live in environment variables)",
+  "type": "object",
+  "required": ["channels", "format"],
+  "additionalProperties": false,
+  "properties": {
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "enabled", "target", "priorities"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" },
+          "type": { "enum": ["slack", "discord", "telegram", "ntfy", "pushover", "kakao", "email"] },
+          "enabled": { "type": "boolean" },
+          "target": { "type": "string", "maxLength": 200 },
+          "priorities": { "type": "array", "uniqueItems": true, "items": { "enum": ["instant", "daily", "weekly"] } }
+        }
+      }
+    },
+    "format": {
+      "type": "object",
+      "required": ["group_by_category", "max_items_per_message", "include_summary"],
+      "additionalProperties": false,
+      "properties": {
+        "group_by_category": { "type": "boolean" },
+        "max_items_per_message": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "include_summary": { "type": "boolean" },
+        "feed_url": { "type": "string", "pattern": "^(https?://.*)?$" }
+      }
+    }
+  }
+}

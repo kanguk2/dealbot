@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "schedule": {
+    "times": [
+      "09:00",
+      "19:00"
+    ],
+    "timezone": "Asia/Seoul"
+  },
+  "categories": [
+    {
+      "id": "points",
+      "name": "포인트·적립",
+      "enabled": true,
+      "keywords": [
+        "출석",
+        "캐시백",
+        "적립",
+        "포인트",
+        "페이백"
+      ],
+      "exclude": [],
+      "sources": [
+        "rss:ppomppu_coupon",
+        "search"
+      ],
+      "min_discount_pct": null,
+      "max_price_krw": null,
+      "priority": "daily"
+    }
+  ],
+  "rss_feeds": {
+    "ppomppu_coupon": "https://www.ppomppu.co.kr/rss.php?id=coupon",
+    "ppomppu_hotdeal": "https://www.ppomppu.co.kr/rss.php?id=ppomppu",
+    "ruliweb_hotdeal": "https://bbs.ruliweb.com/market/board/1020/rss"
+  },
+  "search_hints": [
+    "뽐뿌 쿠폰게시판",
+    "카드사 이벤트",
+    "페이 포인트 적립 이벤트"
+  ],
+  "quiet_hours": {
+    "start": "23:00",
+    "end": "08:00"
+  },
+  "feed_limit": 500,
+  "seen_ttl_days": 30
+}

@@ -1,0 +1,78 @@
+{
+  "channels": [
+    {
+      "id": "ntfy",
+      "type": "ntfy",
+      "enabled": true,
+      "target": "",
+      "priorities": [
+        "instant",
+        "daily"
+      ]
+    },
+    {
+      "id": "slack",
+      "type": "slack",
+      "enabled": false,
+      "target": "#dealbot",
+      "priorities": [
+        "instant",
+        "daily"
+      ]
+    },
+    {
+      "id": "discord",
+      "type": "discord",
+      "enabled": false,
+      "target": "#dealbot",
+      "priorities": [
+        "instant",
+        "daily"
+      ]
+    },
+    {
+      "id": "telegram",
+      "type": "telegram",
+      "enabled": false,
+      "target": "",
+      "priorities": [
+        "instant",
+        "daily",
+        "weekly"
+      ]
+    },
+    {
+      "id": "pushover",
+      "type": "pushover",
+      "enabled": false,
+      "target": "",
+      "priorities": [
+        "instant"
+      ]
+    },
+    {
+      "id": "kakao",
+      "type": "kakao",
+      "enabled": false,
+      "target": "me",
+      "priorities": [
+        "daily"
+      ]
+    },
+    {
+      "id": "email",
+      "type": "email",
+      "enabled": false,
+      "target": "",
+      "priorities": [
+        "weekly"
+      ]
+    }
+  ],
+  "format": {
+    "group_by_category": true,
+    "max_items_per_message": 10,
+    "include_summary": true,
+    "feed_url": "https://kanguk2.github.io/dealbot/"
+  }
+}
