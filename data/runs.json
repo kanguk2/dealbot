@@ -1,3 +1,83 @@
 {
-  "runs": []
+  "runs": [
+    {
+      "at": "2026-10-17T14:06:09+09:00",
+      "found": 15,
+      "new": 4,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "Codex 검색 단계 실패 (Actions 로그 확인)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        }
+      ],
+      "by_source": {
+        "rss:ppomppu_coupon": 15
+      },
+      "dropped": {
+        "no_keyword": 10,
+        "already_seen": 1
+      },
+      "drop_samples": [
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "카카오페이퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/17일자 정답 (& 쇼핑라이브 11시 1개, 19시 2개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[모니모] 오늘의 영어 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 클럽 피드코인 20원 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛! + 우리은행 매일 간식 뽑기",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 261017 토스 두근두근 1등 찍기 팀플전",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[케이뱅크] AI퀴즈 챌린지 - 정답(후보) : 1번 다운사이징 소비",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 슬기로운 금융생활 OX퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    }
+  ]
 }
