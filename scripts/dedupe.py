@@ -79,7 +79,7 @@ def dedupe(candidates: list[dict], config: dict, seen: dict) -> tuple[list[dict]
     for raw in candidates:
         item, reason = clean(raw, categories)
         if item is None:
-            rejected.append((raw.get("title"), reason))
+            rejected.append((raw, reason))
             continue
         key = make_key(item)
         if key in known:
@@ -117,8 +117,8 @@ def main() -> int:
     prune(seen, config.get("seen_ttl_days", 30), today)
 
     new, rejected = dedupe(common.read_items(args.files), config, seen)
-    for title, reason in rejected:
-        print(f"dedupe: skipped {title!r}: {reason}", file=sys.stderr)
+    for raw, reason in rejected:
+        print(f"dedupe: skipped {raw.get('title')!r}: {reason}", file=sys.stderr)
     if args.write:
         remember(seen, new, today)
         common.save_data("seen", seen)

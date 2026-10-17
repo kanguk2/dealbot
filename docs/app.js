@@ -63,6 +63,14 @@ async function gh(path, opts = {}) {
   return res.json();
 }
 
+/** Read a repo text file (e.g. MANUAL.md) without needing a token. */
+async function readText(path) {
+  const url = isLocal ? `../${path}` : `https://raw.githubusercontent.com/${repo()}/${BRANCH}/${path}?t=${Date.now()}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(res.status, `${path}: ${res.status}`);
+  return res.text();
+}
+
 /** Read a repo file as JSON. Returns {data, sha}; sha is null when read without the API. */
 async function readFile(path) {
   if (token()) {
@@ -224,30 +232,67 @@ function toast(msg, kind = "") {
 }
 
 // ------------------------------------------------------------------ feed page
+// The feed shows only the latest run's results (each Codex run replaces data/feed.json items).
+// The page polls for a newer run and redraws itself.
 
 const PAGE = 60;
+const REFRESH_MS = 3 * 60 * 1000;
 const STATUS_FILTERS = { active: ["new", "seen"], bought: ["bought"], ignored: ["ignored"], all: ["new", "seen", "bought", "ignored"] };
+
+/** Local YYYY-MM-DD for "today" comparisons with item.ends. */
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Deals whose end date already passed are never shown, even before the next run removes them. */
+function visibleItems(items, today = todayIso()) {
+  return items.filter((i) => !i.ends || i.ends >= today);
+}
 
 async function initFeed() {
   const ui = { cat: "*", status: "active", shown: PAGE };
-  let feed = { items: [] }, cats = {};
+  let feed = { run_at: null, items: [], pending: [], bought: [] }, cats = {}, runs = null;
   const list = document.getElementById("list");
-
-  const [feedRes, runsRes, cfgRes] = await Promise.allSettled([
-    readFile("data/feed.json"), readFile("data/runs.json"), readFile("data/config.json")]);
-  if (feedRes.status === "rejected") {
-    list.innerHTML = `<p class="empty">피드를 불러오지 못했습니다: ${esc(feedRes.reason.message)}</p>`;
-    return;
-  }
-  feed = feedRes.value.data;
-  if (cfgRes.status === "fulfilled") for (const c of cfgRes.value.data.categories || []) cats[c.id] = c.name;
-  renderRun(runsRes.status === "fulfilled" ? runsRes.value.data : null);
-  renderStats(feed.items);
-
-  const catIds = [...new Set([...Object.keys(cats), ...feed.items.map((i) => i.category)])];
   const tabs = document.getElementById("cats");
-  tabs.replaceChildren(...[["*", "전체"], ...catIds.map((id) => [id, cats[id] || id])].map(([id, name]) =>
-    h("button", { class: id === ui.cat ? "on" : "", onclick: () => { ui.cat = id; ui.shown = PAGE; draw(); } }, name)));
+
+  async function load() {
+    const [feedRes, runsRes, cfgRes] = await Promise.allSettled([
+      readFile("data/feed.json"), readFile("data/runs.json"), readFile("data/config.json")]);
+    if (feedRes.status === "rejected") throw feedRes.reason;
+    feed = { run_at: null, items: [], pending: [], bought: [], ...feedRes.value.data };
+    runs = runsRes.status === "fulfilled" ? runsRes.value.data : null;
+    if (cfgRes.status === "fulfilled") {
+      cats = {};
+      for (const c of cfgRes.value.data.categories || []) cats[c.id] = c.name;
+    }
+    renderRun(runs, feed);
+    renderStats(feed, runs);
+    drawTabs();
+    draw();
+  }
+
+  function drawTabs() {
+    const catIds = [...new Set([...Object.keys(cats), ...feed.items.map((i) => i.category)])];
+    tabs.replaceChildren(...[["*", "전체"], ...catIds.map((id) => [id, cats[id] || id])].map(([id, name]) =>
+      h("button", { class: id === ui.cat ? "on" : "", onclick: () => { ui.cat = id; ui.shown = PAGE; draw(); } }, name)));
+  }
+
+  // Auto refresh: poll the run log; when a newer run landed, reload everything.
+  async function checkForUpdate() {
+    if (document.hidden) return;
+    try {
+      const latest = (await readFile("data/runs.json")).data;
+      const at = latest.runs && latest.runs[0] && latest.runs[0].at;
+      const current = runs && runs.runs && runs.runs[0] && runs.runs[0].at;
+      if (at && at !== current) {
+        await load();
+        toast(`새 실행 결과로 갱신했습니다 (${fmtDateTime(at)})`);
+      }
+    } catch (e) { /* offline or rate-limited: try again next tick */ }
+  }
+  setInterval(checkForUpdate, REFRESH_MS);
+  document.addEventListener("visibilitychange", checkForUpdate);
 
   const statusSel = document.getElementById("status");
   statusSel.addEventListener("change", () => { ui.status = statusSel.value; ui.shown = PAGE; draw(); });
@@ -264,11 +309,11 @@ async function initFeed() {
     try {
       await updateFile("data/feed.json", (data) => {
         const target = (data.items || []).find((i) => i.id === id);
-        if (!target) throw new Error("항목이 피드에서 사라졌습니다 (오래돼 잘렸을 수 있음)");
+        if (!target) throw new Error("새 실행으로 목록이 바뀌었습니다. 새로고침하세요");
         target.status = next;
       }, `ui: mark ${id} ${next}`);
       toast(next === "bought" ? "샀음으로 표시했습니다" : next === "ignored" ? "무시했습니다" : "표시를 해제했습니다");
-      renderStats(feed.items);
+      renderStats(feed, runs);
     } catch (e) {
       item.status = prev; draw();
       toast(`저장 실패: ${e.message}`, "error");
@@ -278,17 +323,20 @@ async function initFeed() {
   function draw() {
     for (const b of tabs.children) b.classList.toggle("on", b.textContent === (ui.cat === "*" ? "전체" : cats[ui.cat] || ui.cat));
     const allowed = STATUS_FILTERS[ui.status];
-    const rows = feed.items.filter((i) => (ui.cat === "*" || i.category === ui.cat) && allowed.includes(i.status));
+    const rows = visibleItems(feed.items).filter((i) => (ui.cat === "*" || i.category === ui.cat) && allowed.includes(i.status));
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    const empty = feed.run_at
+      ? `이번 실행(${esc(fmtDateTime(feed.run_at))})에서 새로 잡힌 딜이 없습니다.`
+      : "아직 실행 결과가 없습니다.";
     list.innerHTML = rows.slice(0, ui.shown).map((it) => {
       let due = "";
       if (it.ends) {
         const days = Math.round((new Date(it.ends + "T00:00:00") - today) / 86400000);
-        due = `<span class="due${days <= 2 ? " soon" : ""}">~${mmdd(it.ends)}${days >= 0 ? ` (D-${days})` : " (마감)"}</span>`;
+        due = `<span class="due${days <= 2 ? " soon" : ""}">~${mmdd(it.ends)} (D-${days})</span>`;
       }
       const price = priceText(it);
       return `<article class="card s-${esc(it.status)}" data-id="${esc(it.id)}">
-        <div class="meta">${esc(cats[it.category] || it.category)} · ${esc(sourceLabel(it.source))} · ${esc(fmtDateTime(it.found_at))}${it.status === "new" ? ' <span class="badge">NEW</span>' : ""}</div>
+        <div class="meta">${esc(cats[it.category] || it.category)} · ${esc(sourceLabel(it.source))}${it.status === "new" ? ' <span class="badge">NEW</span>' : ""}</div>
         <a class="title" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
         ${price || due ? `<div class="price">${price} ${due}</div>` : ""}
         ${it.summary ? `<p class="summary">${esc(it.summary)}</p>` : ""}
@@ -296,40 +344,51 @@ async function initFeed() {
           <button data-act="bought" class="${it.status === "bought" ? "on" : ""}">샀음</button>
           <button data-act="ignored" class="${it.status === "ignored" ? "on" : ""}">무시</button>
         </div></article>`;
-    }).join("") || `<p class="empty">표시할 딜이 없습니다.</p>`;
+    }).join("") || `<p class="empty">${empty}</p>`;
     document.getElementById("more").hidden = rows.length <= ui.shown;
     document.getElementById("count").textContent = `${rows.length}건`;
   }
-  draw();
+
+  try { await load(); }
+  catch (e) { list.innerHTML = `<p class="empty">피드를 불러오지 못했습니다: ${esc(e.message)}</p>`; }
 }
 
-function renderRun(runs) {
+function renderRun(runs, feed) {
   const el = document.getElementById("run");
   const banner = document.getElementById("banner");
   const last = runs && runs.runs && runs.runs[0];
+  banner.hidden = true;
   if (!last) {
-    el.textContent = "아직 실행 기록이 없습니다.";
+    el.innerHTML = '아직 실행 기록이 없습니다. 처음이라면 <a href="guide.html">가이드</a>부터 보세요.';
     banner.textContent = "딜봇이 한 번도 실행되지 않았습니다. Codex Automation 설정을 확인하세요.";
     banner.hidden = false;
     return;
   }
   const hours = (Date.now() - new Date(last.at)) / 3600000;
-  el.innerHTML = `마지막 실행 <b>${esc(fmtDateTime(last.at))}</b> · 찾음 ${last.found} · 새 딜 ${last.new} · 알림 ${last.notified}` +
-    (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "");
+  el.innerHTML = `이번 실행 결과 <b>${esc(fmtDateTime(feed.run_at || last.at))}</b> · 새 딜 ${last.new} · 알림 ${last.notified}` +
+    (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "") +
+    ` · <span class="muted">자동 갱신</span>`;
   if (hours >= 24) {
     banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. Codex Automation 실행 기록을 확인하세요.`;
     banner.hidden = false;
   }
 }
 
-function renderStats(items) {
-  const now = new Date();
+/** Month totals: found deals from the run log, bought deals from feed.bought + the current page. */
+function monthStats(feed, runs, now = new Date()) {
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const month = items.filter((i) => (i.found_at || "").startsWith(ym));
-  const bought = month.filter((i) => i.status === "bought");
+  const found = ((runs && runs.runs) || []).filter((r) => r.at.startsWith(ym)).reduce((s, r) => s + r.new, 0);
+  const ids = new Set();
+  const bought = [...feed.items.filter((i) => i.status === "bought"), ...(feed.bought || [])]
+    .filter((i) => (i.found_at || "").startsWith(ym) && !ids.has(i.id) && ids.add(i.id));
   const saved = bought.reduce((s, i) => s + (i.original_price_krw != null && i.price_krw != null ? Math.max(0, i.original_price_krw - i.price_krw) : 0), 0);
+  return { found, bought: bought.length, saved };
+}
+
+function renderStats(feed, runs) {
+  const s = monthStats(feed, runs);
   document.getElementById("stats").textContent =
-    `이번 달 ${month.length}건 잡음 · 샀음 ${bought.length}건 · 아낀 금액(추정) ${won(saved)}`;
+    `이번 달 ${s.found}건 잡음 · 샀음 ${s.bought}건 · 아낀 금액(추정) ${won(s.saved)}`;
 }
 
 // ------------------------------------------------------------------ settings page
@@ -459,8 +518,10 @@ async function initSettings() {
         field("시작", h("input", { type: "time", value: cfg.quiet_hours.start, onchange: (e) => (cfg.quiet_hours.start = e.target.value) })),
         field("끝", h("input", { type: "time", value: cfg.quiet_hours.end, onchange: (e) => (cfg.quiet_hours.end = e.target.value) }))) : null,
       field("검색 힌트 (Codex 웹 검색에 씀)", tagInput(cfg.search_hints, "입력 후 Enter")),
+      field("마감까지 최소 남은 일수", numInput(cfg, "min_days_left", { min: 0, max: 365 }),
+        "실행 시각 기준으로 마감일이 이 일수보다 가까운 딜은 잡지 않습니다. 이미 끝난 딜은 항상 빠집니다. 0이면 오늘 마감까지 포함. 마감일을 모르는 딜은 통과합니다."),
       h("div", { class: "row" },
-        field("피드 보관 건수", numInput(cfg, "feed_limit", { min: 10, max: 5000 })),
+        field("한 번에 보여줄 최대 건수", numInput(cfg, "feed_limit", { min: 10, max: 5000 })),
         field("중복 판정 보관 일수", numInput(cfg, "seen_ttl_days", { min: 1, max: 365 }))));
   }
 
@@ -596,9 +657,125 @@ function askToken(reason) {
   });
 }
 
+// ------------------------------------------------------------------ guide page (MANUAL.md)
+// A small Markdown renderer for the subset MANUAL.md uses: headings, paragraphs, lists,
+// tables, fenced code, blockquotes, rules, and inline code/bold/links. No CDN by design.
+
+/** GitHub-style heading anchor: lowercase, drop punctuation, spaces -> '-'. */
+function slug(text) {
+  return text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, "").replace(/\s/g, "-");
+}
+
+function mdInline(s) {
+  const codes = [];
+  s = s.replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
+  s = esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, href) => {
+      let url = href.replace(/&amp;/g, "&");
+      if (/^[\w./-]+\.md(#.*)?$/.test(url) && !url.startsWith("MANUAL.md")) {
+        url = `https://github.com/${repo()}/blob/${BRANCH}/${url}`; // other repo docs open on GitHub
+      } else if (url.startsWith("MANUAL.md#")) url = url.slice(9);
+      if (!/^(https?:\/\/|#)/.test(url)) return label;
+      const ext = url.startsWith("http") ? ' target="_blank" rel="noopener noreferrer"' : "";
+      return `<a href="${esc(url)}"${ext}>${label}</a>`;
+    });
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[+i])}</code>`);
+}
+
+function renderMarkdown(md) {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  const isTableSep = (l) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(l);
+  const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    let m;
+    if ((m = line.match(/^```/))) {
+      const buf = [];
+      for (i++; i < lines.length && !/^```/.test(lines[i]); i++) buf.push(lines[i]);
+      i++;
+      out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+    } else if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
+      const n = m[1].length;
+      out.push(`<h${n} id="${esc(slug(m[2].replace(/[`*]/g, "")))}">${mdInline(m[2])}</h${n}>`);
+      i++;
+    } else if (/^(-{3,}|\*{3,})\s*$/.test(line)) {
+      out.push("<hr>"); i++;
+    } else if (line.startsWith(">")) {
+      const buf = [];
+      for (; i < lines.length && lines[i].startsWith(">"); i++) buf.push(lines[i].replace(/^>\s?/, ""));
+      out.push(`<blockquote>${renderMarkdown(buf.join("\n"))}</blockquote>`);
+    } else if (line.includes("|") && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      const head = cells(line);
+      const rows = [];
+      for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) rows.push(cells(lines[i]));
+      out.push(`<div class="tablewrap"><table><thead><tr>${head.map((c) => `<th>${mdInline(c)}</th>`).join("")}</tr></thead><tbody>` +
+        rows.map((r) => `<tr>${r.map((c) => `<td>${mdInline(c)}</td>`).join("")}</tr>`).join("") + "</tbody></table></div>");
+    } else if (/^\s*([-*]|\d+\.)\s+/.test(line)) {
+      out.push(renderList(lines, i, (next) => (i = next)));
+    } else {
+      const buf = [];
+      for (; i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|>|\s*([-*]|\d+\.)\s|(-{3,})\s*$)/.test(lines[i]); i++) buf.push(lines[i].trim());
+      out.push(`<p>${mdInline(buf.join(" "))}</p>`);
+    }
+  }
+  return out.join("\n");
+}
+
+/** Lists with nesting by indentation; continuation lines join the current item. */
+function renderList(lines, start, setIndex) {
+  const indentOf = (l) => l.match(/^\s*/)[0].length;
+  const base = indentOf(lines[start]);
+  const ordered = /^\s*\d+\./.test(lines[start]);
+  const items = [];
+  let i = start;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (!l.trim()) {
+      // a blank line ends the list unless the next line continues it at this level or deeper
+      if (i + 1 < lines.length && indentOf(lines[i + 1]) > base && lines[i + 1].trim()) { i++; continue; }
+      break;
+    }
+    const ind = indentOf(l);
+    const bullet = l.match(/^\s*([-*]|\d+\.)\s+(.*)$/);
+    if (bullet && ind === base) { items.push({ text: [bullet[2]], children: [] }); i++; continue; }
+    if (ind > base && items.length) {
+      if (bullet) { items[items.length - 1].children.push(renderList(lines, i, (n) => (i = n))); continue; }
+      if (/^\s*```/.test(l)) {
+        const buf = [];
+        for (i++; i < lines.length && !/^\s*```/.test(lines[i]); i++) buf.push(lines[i].slice(ind));
+        i++;
+        items[items.length - 1].children.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+        continue;
+      }
+      items[items.length - 1].text.push(l.trim()); i++; continue;
+    }
+    break;
+  }
+  setIndex(i);
+  const tag = ordered ? "ol" : "ul";
+  return `<${tag}>${items.map((it) => `<li>${mdInline(it.text.join(" "))}${it.children.join("")}</li>`).join("")}</${tag}>`;
+}
+
+async function initGuide() {
+  const el = document.getElementById("guide");
+  try {
+    el.innerHTML = renderMarkdown(await readText("MANUAL.md"));
+    const toc = [...el.querySelectorAll("h2")].map((hd) => h("a", { href: `#${hd.id}` }, hd.textContent));
+    document.getElementById("toc").replaceChildren(...toc);
+    if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
+  } catch (e) {
+    el.innerHTML = `<p class="empty">가이드를 불러오지 못했습니다: ${esc(e.message)}</p>`;
+  }
+}
+
 // ------------------------------------------------------------------ boot
 
 document.addEventListener("DOMContentLoaded", () => {
   const page = document.body.dataset.page;
-  (page === "settings" ? initSettings() : initFeed()).catch((e) => toast(e.message, "error"));
+  const init = { settings: initSettings, guide: initGuide }[page] || initFeed;
+  init().catch((e) => toast(e.message, "error"));
 });

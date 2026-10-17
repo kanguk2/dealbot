@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>테스트 게시판</title>
+<item><title>[쿠팡] 노트북 특가 1,260,630원 -20%</title><link>https://example.com/1</link>
+<pubDate>Sat, 17 Oct 2026 10:42:07 +0900</pubDate><description><![CDATA[<img src="https://i.example.com/a.jpg"> 본문 <b>요약</b> https://link.example.com/x]]></description></item>
+<item><title>[슈퍼SOL] 100% 당첨 룰렛 적립</title><link>https://example.com/2</link>
+<pubDate>Sat, 17 Oct 2026 09:00:00 +0900</pubDate><description>매일 포인트 적립</description></item>
+<item><title>오래된 글 ￦7,920</title><link>https://example.com/3</link>
+<pubDate>Thu, 15 Oct 2026 09:00:00 +0900</pubDate><description></description></item>
+</channel></rss>

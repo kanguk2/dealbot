@@ -137,6 +137,25 @@ button.add { margin: 4px 0; }
 .result.error { color: var(--danger); }
 .result.ok { color: var(--ok); }
 
+/* guide */
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.toc a { font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; background: var(--card); }
+.guide { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 16px; overflow-wrap: anywhere; }
+.guide h1 { font-size: 20px; }
+.guide h2 { font-size: 17px; color: var(--text); margin: 28px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); scroll-margin-top: 60px; }
+.guide h3 { font-size: 15px; margin: 18px 0 6px; scroll-margin-top: 60px; }
+.guide p, .guide li { font-size: 14px; }
+.guide ul, .guide ol { padding-left: 20px; }
+.guide code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+.guide pre { background: var(--bg); padding: 10px 12px; border-radius: 8px; overflow-x: auto; }
+.guide pre code { padding: 0; background: none; }
+.guide blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.guide hr { border: 0; border-top: 1px solid var(--line); }
+.tablewrap { overflow-x: auto; }
+.guide table { border-collapse: collapse; font-size: 13px; margin: 8px 0; min-width: 100%; }
+.guide th, .guide td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.guide th { background: var(--bg); }
+
 .tokdlg {
   width: min(420px, calc(100% - 32px)); padding: 16px;
   background: var(--card); color: var(--text);

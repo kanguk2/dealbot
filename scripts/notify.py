@@ -60,24 +60,31 @@ def in_quiet_hours(now: datetime, quiet: dict | None) -> bool:
     return start <= cur < end if start < end else (cur >= start or cur < end)
 
 
+def window(priority: str, now: datetime) -> tuple[datetime, datetime]:
+    """found_at range [lo, hi) whose items are due for this priority right now."""
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if priority == "instant":
+        return now - timedelta(hours=48), now + timedelta(minutes=1)
+    if priority == "daily":
+        return day_start - timedelta(days=8), day_start
+    monday = day_start - timedelta(days=now.weekday())  # weekly
+    return monday - timedelta(days=14), monday
+
+
 def due_items(items: list[dict], priority: str, channel_id: str, now: datetime,
               config: dict, cat_priority: dict) -> list[dict]:
     """Items of this priority that this channel has not received and are due now."""
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if priority == "instant":
-        if in_quiet_hours(now, config.get("quiet_hours")):
-            return []
-        lo, hi = now - timedelta(hours=48), now + timedelta(minutes=1)
-    elif priority == "daily":
-        lo, hi = day_start - timedelta(days=8), day_start
-    else:  # weekly
-        monday = day_start - timedelta(days=now.weekday())
-        lo, hi = monday - timedelta(days=14), monday
+    if priority == "instant" and in_quiet_hours(now, config.get("quiet_hours")):
+        return []
+    lo, hi = window(priority, now)
     out = []
     for it in items:
         if cat_priority.get(it.get("category")) != priority or it.get("status") == "ignored":
             continue
         if channel_id in (it.get("notified") or []):
+            continue
+        ends = common.parse_date(it.get("ends"))
+        if ends and ends < now.date():  # ended while waiting for a digest
             continue
         found = common.parse_dt(it.get("found_at"))
         if found and lo <= found < hi:
@@ -131,12 +138,34 @@ def _send(n: Notifier, items: list[dict], priority: str) -> tuple[SendResult, st
 
 # ---------------------------------------------------------------- modes
 
+def prune_pending(pending: list[dict], notifiers: dict, cat_priority: dict, now: datetime) -> list[dict]:
+    """Drop queue entries every interested channel has received, or that aged out of their window."""
+    keep = []
+    for it in pending:
+        prio = cat_priority.get(it.get("category"))
+        wanted = {c["id"] for c in notifiers.get("channels", [])
+                  if c.get("enabled") and prio in c.get("priorities", [])}
+        found = common.parse_dt(it.get("found_at"))
+        if prio is None or it.get("status") == "ignored" or wanted <= set(it.get("notified", [])):
+            continue
+        if found and found < window(prio, now)[0]:
+            continue
+        keep.append(it)
+    return keep
+
+
 def run_since(args, config, notifiers, now) -> int:
-    feed = common.load_data("feed", {"items": []})
+    from run_deterministic import load_feed
+    feed = load_feed()
     runs = common.load_data("runs", {"runs": []})
     cat_priority = {c["id"]: c.get("priority", "instant") for c in config.get("categories", [])}
     channels = build_channels(notifiers, config, now, args.dry_run, args.channel)
-    items = feed.get("items", [])
+    # Send from the queue: the page feed is replaced every run, the queue keeps digests alive.
+    shown = {it["id"]: it for it in feed["items"]}
+    items = feed["pending"]
+    for it in items:  # 무시 on the page also stops pending notifications
+        if it["id"] in shown:
+            it["status"] = shown[it["id"]]["status"]
     errors, alerts, notified_ids = [], [], set()
     kakao_error = None
 
@@ -150,8 +179,10 @@ def run_since(args, config, notifiers, now) -> int:
             kakao_error = kakao_error or kerr
             sent = {it["id"] for it in batch} if res.ok else set(res.item_ids)
             for it in batch:
-                if it["id"] in sent and cid not in it["notified"]:
-                    it["notified"].append(cid)
+                if it["id"] in sent:
+                    for copy_ in (it, shown.get(it["id"])):  # queue entry and page entry
+                        if copy_ is not None and cid not in copy_["notified"]:
+                            copy_["notified"].append(cid)
             notified_ids |= sent
             print(f"notify: {cid} {priority}: {len(sent)}/{len(batch)} items, "
                   f"{res.messages} messages{'' if res.ok else ' ERROR ' + str(res.error)}")
@@ -183,6 +214,7 @@ def run_since(args, config, notifiers, now) -> int:
     print(f"notify: {len(notified_ids)} items sent, {len(errors)} errors")
     if args.dry_run:
         return 0
+    feed["pending"] = prune_pending(feed["pending"], notifiers, cat_priority, now)
     common.save_data("feed", feed)
     if latest is not None:
         latest["notified"] = latest.get("notified", 0) + len(notified_ids)

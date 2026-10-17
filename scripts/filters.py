@@ -5,7 +5,10 @@ Rules, in order:
   - rss:* source and no keyword matches    -> drop (feeds carry every deal; keywords narrow them)
   - discount_pct < min_discount_pct        -> drop (unknown discount passes)
   - price_krw > max_price_krw              -> drop (unknown price passes)
-  - ends before today                      -> drop
+  - ends before today                      -> drop (never shown, never notified)
+  - ends before today + min_days_left      -> drop (config.min_days_left; unknown end date passes)
+
+"today" is the run's clock in config.schedule.timezone (DEALBOT_NOW overrides it in tests).
 
 Usage: python scripts/filters.py [FILE ...]   (default stdin) -> kept items on stdout
 """
@@ -13,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import timedelta
 
 import common
 
@@ -25,7 +29,7 @@ def _has_any(text: str, words: list[str]) -> str | None:
     return None
 
 
-def reason_to_drop(item: dict, cat: dict, today) -> str | None:
+def reason_to_drop(item: dict, cat: dict, today, min_days_left: int = 0) -> str | None:
     text = f"{item.get('title') or ''} {item.get('summary') or ''}"
     hit = _has_any(text, cat.get("exclude") or [])
     if hit:
@@ -44,17 +48,20 @@ def reason_to_drop(item: dict, cat: dict, today) -> str | None:
     ends = common.parse_date(item.get("ends"))
     if ends and ends < today:
         return f"ended {ends}"
+    if ends and ends < today + timedelta(days=min_days_left):
+        return f"ends {ends}, less than {min_days_left} days left"
     return None
 
 
 def apply(items: list[dict], config: dict, today) -> tuple[list[dict], list[tuple]]:
     cats = {c["id"]: c for c in config.get("categories", [])}
+    min_days = int(config.get("min_days_left") or 0)
     kept, dropped = [], []
     for it in items:
         cat = cats.get(it.get("category"))
-        why = "unknown category" if cat is None else reason_to_drop(it, cat, today)
+        why = "unknown category" if cat is None else reason_to_drop(it, cat, today, min_days)
         if why:
-            dropped.append((it.get("title"), why))
+            dropped.append((it, why))
         else:
             kept.append(it)
     return kept, dropped
@@ -67,8 +74,8 @@ def main() -> int:
     args = ap.parse_args()
     config = common.load_data("config", {})
     kept, dropped = apply(common.read_items(args.files), config, common.now(config).date())
-    for title, why in dropped:
-        print(f"filter: dropped {title!r}: {why}", file=sys.stderr)
+    for it, why in dropped:
+        print(f"filter: dropped {it.get('title')!r}: {why}", file=sys.stderr)
     common.dump(kept)
     return 0
 
