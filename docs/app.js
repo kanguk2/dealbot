@@ -613,7 +613,7 @@ function renderRun(runs, feed, config) {
   if (!last) {
     label.innerHTML = '<span class="status-dot stale"></span>첫 실행 대기';
     meta.textContent = "";
-    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. GitHub Actions의 dealbot 워크플로를 한 번 실행하세요(가이드 참고).";
+    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. PC의 Codex 앱 예약 작업을 만들고 한 번 실행하세요(가이드 참고).";
     banner.hidden = false;
     return;
   }
@@ -622,7 +622,7 @@ function renderRun(runs, feed, config) {
   meta.innerHTML = `${esc(fmtDateTime(feed.run_at || last.at))} 실행 · 찾음 ${last.found} · 새 딜 ${last.new} · 알림 ${last.notified}` +
     (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "");
   if (hours >= 24) {
-    banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. GitHub Actions의 dealbot 실행 기록을 확인하세요.`;
+    banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. PC의 Codex 앱 예약 작업 기록과 GitHub Actions 로그를 확인하세요.`;
     banner.hidden = false;
   }
 }
@@ -765,7 +765,7 @@ async function initSettings() {
     if (!cfg.quiet_hours) cfg.quiet_hours = null;
     const quietOn = !!cfg.quiet_hours;
     return h("div", null,
-      field("실행 시간 (dealbot.yml의 cron과 맞추세요)", h("div", { class: "times" },
+      field("실행 시간 (Codex 앱 예약 작업 시간과 맞추세요)", h("div", { class: "times" },
         times.map((t, i) => h("span", { class: "time" },
           h("input", { type: "time", value: t, onchange: (e) => (times[i] = e.target.value) }),
           h("button", { type: "button", "aria-label": "삭제", onclick: () => { times.splice(i, 1); draw(); } }, "×"))),
@@ -883,8 +883,8 @@ async function initSettings() {
       original = snapshot();
       out.className = "result ok";
       out.replaceChildren(h("b", null, "저장했습니다."), timesChanged
-        ? h("p", null, `실행 시간을 ${cfg.schedule.times.join(", ")}(으)로 바꿨습니다. .github/workflows/dealbot.yml의 cron(UTC 기준)도 같이 바꾸세요.`)
-        : h("p", null, "실행 시간을 바꿨다면 dealbot.yml의 cron도 바꾸세요."));
+        ? h("p", null, `실행 시간을 ${cfg.schedule.times.join(", ")}(으)로 바꿨습니다. Codex 앱 예약 작업 시간과 dealbot.yml 안전망 cron(UTC, 1시간 뒤)도 같이 바꾸세요.`)
+        : h("p", null, "실행 시간을 바꿨다면 Codex 앱 예약 작업 시간도 바꾸세요."));
       draw();
     } catch (e) {
       out.className = "result error"; out.textContent = `저장 실패: ${e.message}`;

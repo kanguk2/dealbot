@@ -2,7 +2,7 @@
 
 내가 정한 분야·키워드의 특가, 포인트 적립, 할인 이벤트를 하루 몇 번 모아서 원하는 채널(ntfy 폰 푸시, Slack, Discord, Telegram, Pushover, 카카오톡, 이메일)로 보내 주는 개인용 봇이다. 서버는 없다.
 
-- **수집·판단·알림 실행**: GitHub Actions(`dealbot.yml`, 하루 1회 09:00 KST)가 [`CODEX.md`](CODEX.md) 순서대로 돌리고, 웹 검색과 검색 요령 학습은 Codex(`openai/codex-action`)가 맡는다.
+- **수집·판단 실행**: 매일 09:00 PC의 Codex 앱 예약 작업(ChatGPT 구독)이 [`CODEX.md`](CODEX.md) 순서대로 웹 검색·수집·학습을 하고 push한다. 알림은 GitHub Actions(`notify.yml`)가 보내고, PC가 꺼진 날은 10:00 `dealbot.yml`이 RSS만 수집한다.
 - **설정·피드 보기**: GitHub Pages (`docs/`). 폰 브라우저에서 편집한다.
 - **상태**: 이 저장소의 `data/*.json`이 전부다. 되돌리기는 `git revert` 한 번이면 된다.
 
@@ -28,8 +28,9 @@ dealbot/
 │   └── notifiers/       채널 플러그인 (파일 하나 = 채널 하나)
 ├── schemas/         JSON Schema (UI와 validate.py가 같이 씀)
 ├── CODEX.md         Codex 운영 지침
-├── .github/workflows/dealbot.yml   정기 실행 (매일 09:00 KST, Codex 검색 포함)
-└── .github/codex/   워크플로가 Codex에게 주는 프롬프트 (검색, 회고)
+├── scripts/local_run.py   PC 실행 도우미 (prepare / collect / publish)
+├── .github/workflows/   notify.yml(push 후 알림), dealbot.yml(10:00 안전망·API 키 방식), health.yml(주간 점검), tests.yml
+└── .github/codex/   Codex 프롬프트: scheduled.md(PC 예약 작업), search.md·review.md(API 키 방식)
 ```
 
 ## 로컬에서 돌려 보기
@@ -122,31 +123,36 @@ GitHub **Settings → Developer settings → Fine-grained personal access tokens
 
 refresh_token은 약 2개월 동안 유효하다. 만료되면 `notify.py`가 다른 켜진 채널로 "카카오 토큰 갱신 필요" 알림을 보낸다(하루 1회). 그때 6~7단계를 다시 한다.
 
-### 4. 자동 실행 연결 (GitHub Actions + Codex)
+### 4. 자동 실행 연결 (ChatGPT 구독 + Codex 앱 예약 작업)
 
-Codex cloud의 예약 작업(Automation)은 저장소 `main`에 무인으로 push하는 흐름을 지원하지 않는다(2026-10 기준). 예약 작업은 PC 데스크톱 앱이나 팀 플랜에서만 돌고, cloud 작업은 사람이 검토한 뒤 커밋하거나 PR을 연다. 그래서 딜봇은 **GitHub Actions 워크플로 `.github/workflows/dealbot.yml`**이 정해진 시간에 실행하고, 판단이 필요한 두 단계만 공식 [`openai/codex-action`](https://github.com/openai/codex-action)으로 Codex에게 맡긴다.
+ChatGPT 구독으로 Codex를 쓰려면 **이 PC의 Codex 데스크톱 앱 예약 작업**이 매일 09:00에 돌게 한다. 참고한 Flight Watch도 같은 구조다. PC에서 수집하고 `main`에 push한다. Codex cloud는 예약 실행으로 `main`에 무인 push를 하지 못하고, API 키 방식은 구독과 별도로 API 요금이 든다.
 
-| 단계 (CODEX.md) | 누가 | 비고 |
-| --- | --- | --- |
-| 2. 웹 검색 → `.tmp/search.json` | Codex (`--search`) | 프롬프트: `.github/codex/search.md` |
-| 3~5. 수집·중복·필터·검증·알림 | 워크플로 스크립트 | 결정적 |
-| 6. 플레이북 개선 | Codex | 프롬프트: `.github/codex/review.md`. `data/playbook.md` 말고 다른 파일을 고치면 버린다 |
-| 7. `data/` 커밋·push | 워크플로 | `GITHUB_TOKEN`(contents: write) |
+```
+09:00  PC · Codex 앱 예약 작업 (구독)
+         local_run.py prepare → Codex 웹 검색 → local_run.py collect → Codex 플레이북 개선 → local_run.py publish
+         └ push "codex: run …"
+            └ GitHub Actions notify.yml: 알림 전송 (알림 시크릿은 GitHub에만 있음)
+10:00  GitHub Actions dealbot.yml: 오늘 실행이 없으면(PC가 꺼져 있었으면) RSS만이라도 수집
+```
 
-설정 순서 (저장소 소유자 계정으로):
+설정 순서:
 
-1. **OpenAI API 키 발급**: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)에서 만든다. 결제 수단을 등록하고, 월 사용 한도(Usage limits)를 정해 두는 것을 권장한다. 실행 1회가 Codex 호출 2번(검색, 회고)이고, API 사용량만큼 과금된다.
-2. 저장소 **Settings → Secrets and variables → Actions → New repository secret**에 넣는다.
-   - `OPENAI_API_KEY`: 1번 키. **없어도 워크플로는 돈다.** 키가 없으면 RSS·에픽 같은 결정적 소스만 수집하고, 웹 검색과 플레이북 학습은 건너뛴다.
-   - `DEALBOT_NTFY_TOPIC` 등 알림 시크릿: 3단계 표 참고
-3. **Settings → Actions → General → Workflow permissions**가 "Read and write permissions"인지 확인한다(기본값이 read only인 경우가 있다). 워크플로 파일에 `permissions: contents: write`가 있어서 보통은 그대로 동작한다.
-4. **Actions 탭 → dealbot → Run workflow**로 한 번 수동 실행한다. 끝나면 `codex: run …`(키가 없으면 `actions: run …`) 커밋이 생기고, 피드 화면에 결과와 실행 기록이 뜬다. 실행 요약(Summary)에 "찾은 N건, 새 M건, 알림 K건, 오류"와 Codex의 한 줄 보고가 나온다.
-5. 이후에는 매일 09:00 KST에 자동으로 돈다(사용자 요청으로 하루 1회). 시간을 바꾸려면 `dealbot.yml`의 `cron`(UTC 기준)과 설정 화면의 "실행 시간"을 같이 바꾼다.
+1. **알림 시크릿**: 저장소 **Settings → Secrets and variables → Actions → Secrets**에 `DEALBOT_NTFY_TOPIC` 등을 넣는다(3단계 표 참고). PC에는 알림 토큰을 두지 않는다.
+2. **PC 준비**: 이 저장소가 PC에 clone되어 있어야 한다. `git push`가 되는 계정이어야 하고, Windows의 `py` 런처나 Python 3.10 이상이 필요하다. 처음 한 번 `py -3 scripts/local_run.py prepare`를 실행하면 `.venv`가 만들어진다.
+3. **Codex 앱 예약 작업 만들기**:
+   1. ChatGPT(Codex) 데스크톱 앱에서 이 저장소 폴더를 프로젝트로 연다.
+   2. 사이드바 **Scheduled**에서 새 작업을 만든다. 일정은 매일 09:00이다.
+   3. 실행 위치는 **local project**로 고른다. worktree를 고르면 실행마다 worktree가 쌓인다.
+   4. 프롬프트에는 [`.github/codex/scheduled.md`](.github/codex/scheduled.md) 내용을 그대로 붙여 넣는다.
+   5. 권한(sandbox)은 **Full access**로 한다. RSS 받기, 웹 검색, `git push`에 네트워크가 필요하다. 예약 작업은 사람 없이 돌아서 승인 창을 띄울 수 없다.
+4. **한 번 수동 실행**: 예약 작업에서 "지금 실행"을 누른다. 또는 Codex 채팅에 같은 프롬프트를 준다. `codex: run …` 커밋이 생기고, 이어서 Actions의 `notify`가 돌고, 피드 화면이 갱신되면 성공이다.
+5. PC는 09:00에 켜져 있고 Codex 앱이 실행 중이어야 한다. 화면 잠금이나 잠자기 상태면 실행되지 않을 수 있다. 그런 날은 10:00에 Actions가 RSS만 수집한다.
 
-참고:
-- GitHub의 예약 실행은 몇 분에서 수십 분 늦을 수 있다. 저장소에 60일 동안 활동이 없으면 예약이 꺼지지만, 이 봇은 매 실행 커밋하므로 꺼지지 않는다.
-- 워크플로가 실패하면 GitHub가 저장소 소유자에게 메일을 보낸다. 피드 화면도 24시간 이상 실행이 없으면 배너를 띄운다.
-- Codex 검색 단계는 `permission-profile: ":workspace"`로 저장소 폴더 안에서만 파일을 쓸 수 있고, push 권한은 받지 못한다(`persist-credentials: false`).
+시간을 바꾸려면 Codex 예약 작업 시간, 설정 화면의 "실행 시간", `dealbot.yml`의 cron(안전망, UTC 기준)을 같이 바꾼다.
+
+#### API 키 방식 (선택, 구독과 별도 과금)
+
+PC 없이 클라우드에서만 돌리고 싶으면 저장소 Secret `OPENAI_API_KEY`(platform.openai.com, 크레딧 필요)를 넣는다. 그러면 10:00 `dealbot.yml`이 GitHub Actions 안에서 [`openai/codex-action`](https://github.com/openai/codex-action)으로 검색과 학습까지 한다. 단, 그날 PC 실행이 이미 있었으면 건너뛴다. 키가 크레딧 없이 남아 있으면 매일 "Quota exceeded" 오류가 기록되니, 쓰지 않을 거면 Secret을 지운다.
 
 #### Codex를 사람이 직접 돌리고 싶을 때
 

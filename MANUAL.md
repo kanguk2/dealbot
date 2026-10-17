@@ -1,6 +1,6 @@
 # 딜봇 사용 설명서
 
-> 마지막 갱신: 2026-10-17 · 정기 실행을 하루 1번(09:00 KST)으로 줄임, 기본 `points` 우선순위를 즉시로 바꿈, `OPENAI_API_KEY`는 Variables가 아니라 Secrets에 둠
+> 마지막 갱신: 2026-10-18 · 정기 실행을 PC의 Codex 앱 예약 작업(ChatGPT 구독, 09:00)으로 옮김. 알림은 push 후 Actions `notify`가 보내고, 10:00 `dealbot`은 PC 실행이 없던 날만 RSS를 수집하는 안전망이 됨
 
 설치와 처음 설정은 [README.md](README.md)에 있다. 이 문서는 설치 이후 쓰는 법이다. 상황에 맞는 제목을 찾아 읽으면 된다.
 
@@ -14,11 +14,13 @@
 
 ## 한눈에 보기
 
-1. GitHub Actions의 `dealbot` 워크플로(`.github/workflows/dealbot.yml`)가 하루 한 번(09:00 KST) [`CODEX.md`](CODEX.md) 순서대로 돈다. RSS를 읽고, 저장소 시크릿 `OPENAI_API_KEY`가 있으면 Codex가 [검색 플레이북](#검색-요령플레이북-보기고치기)과 [관심사](#관심사-바꾸기)대로 웹 검색을 한다. 중복과 조건에 안 맞는 글을 거른다. 피드는 **이번 실행에서 새로 잡힌 딜로 통째로 바뀐다**.
-2. 같은 실행에서 `notify.py`가 보낼 때가 된 딜을 켜진 채널로 보낸다. 기본은 ntfy 폰 푸시 하나다.
-3. 알림을 누르면 피드 화면이 열린다. 맨 위 **대표 딜**(또는 **관심 딜**)과 **모아보기**를 훑고, 아래 **이번 실행 결과**에서 원글로 간다. **샀음**, **무시**, **☆ 관심**을 눌러 정리한다. 이 표시는 다음 검색을 다듬는 데 쓰인다.
-4. 실행 끝에 Codex가 이번 실행을 돌아보고 `data/playbook.md`(검색 요령)를 고친다. `OPENAI_API_KEY`가 없으면 웹 검색과 이 단계는 건너뛴다.
+1. 매일 09:00에 **이 PC의 Codex 데스크톱 앱 예약 작업**(ChatGPT 구독)이 [`.github/codex/scheduled.md`](.github/codex/scheduled.md) 프롬프트대로 돈다. 순서는 `py -3 scripts/local_run.py prepare`(main 받기) → Codex 웹 검색([검색 플레이북](#검색-요령플레이북-보기고치기)과 [관심사](#관심사-바꾸기) 기준, 결과는 `.tmp/search.json`) → `local_run.py collect`(RSS 수집, 중복·조건 거르기, 기록) → Codex가 `data/playbook.md`(검색 요령) 개선 → `local_run.py publish`(`data/`를 `codex: run …`으로 커밋해 `main`에 push)다. 피드는 **이번 실행에서 새로 잡힌 딜로 통째로 바뀐다**.
+2. 그 push를 받은 GitHub Actions `notify` 워크플로(`.github/workflows/notify.yml`)가 보낼 때가 된 딜을 켜진 채널로 보내고, 보낸 기록을 `actions: notify …`로 커밋한다. 알림 시크릿은 GitHub에만 있고 PC에는 없다. 기본 채널은 ntfy 폰 푸시 하나다.
+3. 10:00 KST에 Actions `dealbot` 워크플로(`.github/workflows/dealbot.yml`)가 안전망으로 돈다. 오늘 실행이 이미 있으면 아무것도 하지 않는다. PC가 꺼져 있거나 잠들어 실행이 없었으면 RSS만 수집하고 알림까지 보낸다. 웹 검색·플레이북 개선은 선택인 `OPENAI_API_KEY`가 있을 때만 한다.
+4. 알림을 누르면 피드 화면이 열린다. 맨 위 **대표 딜**(또는 **관심 딜**)과 **모아보기**를 훑고, 아래 **이번 실행 결과**에서 원글로 간다. **샀음**, **무시**, **☆ 관심**을 눌러 정리한다. 이 표시는 다음 검색을 다듬는 데 쓰인다.
 5. 조건을 바꾸고 싶으면 설정 화면에서 고치고 **저장**을 누른다. 다음 실행부터 반영된다.
+
+조건: 09:00에 PC가 켜져 있고 Codex 앱이 실행 중이어야 한다. 화면 잠금이나 잠자기 상태면 돌지 않을 수 있다. 예약 작업은 실행 위치 **local project**(worktree 아님), 권한 **Full access**로 만들어 둔다. 만드는 법은 README "4. 자동 실행 연결 (ChatGPT 구독 + Codex 앱 예약 작업)".
 
 ## 매일 쓰기
 
@@ -28,7 +30,7 @@
 - 본문 한 줄은 `• 제목 · 가격 · 출처 · ~마감일`이다. 모르는 값은 빠진다. 그 아래 줄에 원글 주소와 요약이 붙는다.
 - ntfy·Pushover·카카오톡 알림을 누르면 **피드 화면**이 열린다. 원글로 바로 가려면 피드에서 제목을 누른다. Slack·Discord·Telegram은 제목 자체가 원글 링크다.
 - 한 번에 메시지는 3개까지만 온다. 넘친 딜은 피드에서 본다. 모든 채널의 마지막 메시지에 "외 N건, 피드에서 확인"이 붙는다. 카카오톡은 200자를 넘으면 목록이 잘리지만 이 문구는 남는다.
-- 기본 설정에서 `points` 카테고리는 우선순위가 **즉시**(instant)다. 그래서 매일 아침 09:00 실행에서 잡힌 딜이 그 자리에서 바로 온다. 하루 한 번만 돌기 때문에 **하루 묶음**(daily)으로 바꾸면 다음 날 아침에야 온다(하루 늦음).
+- 기본 설정에서 `points` 카테고리는 우선순위가 **즉시**(instant)다. 그래서 매일 아침 09:00 실행에서 잡힌 딜이 push 직후(Actions `notify`가 도는 몇 분 뒤) 바로 온다. 하루 한 번만 돌기 때문에 **하루 묶음**(daily)으로 바꾸면 다음 날 아침에야 온다(하루 늦음).
 
 ### 피드 화면 보는 법
 
@@ -89,7 +91,7 @@
 | --- | --- | --- |
 | 조건에 맞는 딜이 없습니다. | 딜은 있는데 검색어·분야·상태 필터에 다 걸렸다. 필터를 바꾼다 | **검색 조건 바꾸기 ↗**(설정) |
 | 이번 실행에서 새로 잡힌 딜이 없습니다. | 마지막 실행에서 새 딜이 0건이다. 정상이다 | **검색 조건 바꾸기 ↗**(설정) |
-| 아직 실행 결과가 없습니다. | `dealbot` 워크플로가 한 번도 돌지 않았다 | **사용 가이드 보기 ↗**(가이드) |
+| 아직 실행 결과가 없습니다. | 정기 실행(Codex 앱 예약 작업이나 `dealbot` 안전망)이 한 번도 돌지 않았다 | **사용 가이드 보기 ↗**(가이드) |
 
 딜이 없어도 기본 보기에서는 위의 **모아보기** 링크는 보인다.
 
@@ -119,7 +121,7 @@
   - 그 딜의 카테고리 키워드 중 제목에 들어 있는 것. 예: `적립`
   - 배운 키워드가 있으면 "관심에 저장했습니다. 다음부터 'KB Pay · 적립' 위주로 보여줍니다" 토스트가 뜬다.
 - 관심 키워드가 생기면 피드 첫 화면의 **대표 딜**이 **관심 딜**로 바뀌고, **모아보기**도 맞는 묶음이 위로 온다([피드 화면 보는 법](#피드-화면-보는-법)).
-- 다음 실행부터 Codex가 웹 검색 때 관심 키워드와 저장한 딜에 겹치는 검색어를 먼저 쓴다. 실행 회고(`review_run.py`)는 관심 키워드에 맞는 새 딜이 있었는지(`interest_hits`) 없었는지(`interest_miss`)를 남기고, Codex는 맞는 딜이 없으면 관심 키워드가 들어간 검색어를 플레이북에 하나 추가한다. `OPENAI_API_KEY`가 없으면 이 부분은 돌지 않고, 화면의 관심 딜 정렬만 동작한다.
+- 다음 실행부터 Codex가 웹 검색 때 관심 키워드와 저장한 딜에 겹치는 검색어를 먼저 쓴다. 실행 회고(`review_run.py`)는 관심 키워드에 맞는 새 딜이 있었는지(`interest_hits`) 없었는지(`interest_miss`)를 남기고, Codex는 맞는 딜이 없으면 관심 키워드가 들어간 검색어를 플레이북에 하나 추가한다. PC 실행이 없어 안전망이 RSS만 수집한 날은 이 부분이 돌지 않고, 화면의 관심 딜 정렬만 동작한다.
 - **★ 관심**을 한 번 더 누르면 저장 목록에서 빠진다. 이때 **배운 관심 키워드는 남는다**. 키워드는 설정 **관심사**에서 지운다([관심사 바꾸기](#관심사-바꾸기)).
 - 관심 키워드는 RSS 거름망에는 쓰이지 않는다. 받는 딜 자체를 넓히거나 좁히려면 카테고리 키워드를 고친다.
 
@@ -127,7 +129,7 @@
 
 모든 설정은 설정 화면(제목 **SETTINGS**)에서 고치고, 화면 맨 아래에 붙어 있는 **저장** 버튼을 눌러야 반영된다. 이 버튼은 스크롤해도 화면 아래에 계속 보인다. 저장하면 `data/config.json`, `data/notifiers.json`, `data/interests.json` 중 바뀐 파일만 `ui: update config`, `ui: update notifiers`, `ui: update interests` 커밋으로 `main`에 들어간다. 저장 전에 화면이 스키마로 검사하고, 문제가 있으면 "저장하지 않았습니다. 고칠 곳:" 아래에 목록을 보여 준다.
 
-`dealbot` 워크플로는 실행할 때마다 `main`을 새로 받아서 돌므로, 저장한 설정은 **다음 실행**부터 적용된다.
+PC 실행은 `local_run.py prepare`에서, `dealbot` 안전망은 시작할 때 `main`을 새로 받아서 돌므로, 저장한 설정은 **다음 실행**부터 적용된다.
 
 ### 관심사 바꾸기
 
@@ -156,7 +158,7 @@
 - **켜기**를 끄면 그 카테고리는 수집하지 않는다. 이미 피드에 있는 항목은 그대로 남는다.
 - **삭제**는 확인 창을 거친다. 피드의 기존 항목은 지워지지 않는다. 피드의 **분야** 목록에는 카테고리 ID로 계속 보인다.
 - **소스** 체크박스로 이 카테고리에 쓸 소스를 고른다.
-  - **웹 검색 (Codex)**: Codex가 플레이북, 관심사, 키워드, 검색 힌트로 직접 찾는다. 저장소 Actions 시크릿 `OPENAI_API_KEY`가 없으면 체크해 둬도 검색하지 않는다(README "4. 자동 실행 연결").
+  - **웹 검색 (Codex)**: PC의 Codex 앱 예약 작업이 플레이북, 관심사, 키워드, 검색 힌트로 직접 찾는다. 10:00 `dealbot` 안전망 실행에서는 저장소 시크릿 `OPENAI_API_KEY`가 있을 때만 검색한다(README "4. 자동 실행 연결").
   - **RSS `<id>`**: 설정의 RSS 피드 목록에 있는 피드다.
   - **에픽 무료게임**: 에픽게임즈 스토어 주간 무료 게임. 기본 설정에서는 쓰지 않는다. 게임을 받고 싶으면 카테고리를 하나 만들어 이 소스를 체크한다. 키워드 검사를 하지 않으므로 키워드는 아무 단어 하나면 된다.
 - **우선순위**: **즉시**(instant), **하루 묶음**(daily), **주간 묶음**(weekly). 언제 오는지는 [알림 규칙 이해하기](#알림-규칙-이해하기) 참고. 우선순위를 바꿀 때는 받을 채널의 **받을 우선순위**에도 그 값이 체크돼 있는지 확인한다.
@@ -181,13 +183,13 @@
 
 ### 알림 시간·조용한 시간 바꾸기
 
-**실행 시간**은 설정 화면 **실행·기타**에 있지만, 이 값은 기록용이다. 실제로 언제 도는지는 **`.github/workflows/dealbot.yml`의 `cron`**이 정한다. 스크립트는 이 값을 읽지 않는다. 그래서 둘을 항상 같이 바꾼다.
+**실행 시간**은 설정 화면 **실행·기타**에 있지만, 이 값은 기록용이다(피드의 "매일 09:00 KST에 확인" 문구에만 쓰인다). 실제로 언제 도는지는 **Codex 앱 예약 작업의 시간**이 정하고, 안전망은 **`.github/workflows/dealbot.yml`의 `cron`**이 정한다. 그래서 세 곳을 항상 같이 바꾼다.
 
-1. 설정 화면 **실행·기타 → 실행 시간 (dealbot.yml의 cron과 맞추세요)**에서 시간을 고친다. **+**로 추가하고 **×**로 지운다. 저장할 때 중복을 없애고 정렬한다.
-2. **저장**을 누른다. 시간이 바뀌었으면 "실행 시간을 …(으)로 바꿨습니다. .github/workflows/dealbot.yml의 cron(UTC 기준)도 같이 바꾸세요."가 뜬다.
-3. GitHub에서 `.github/workflows/dealbot.yml`을 열어 연필 아이콘으로 고친다. `schedule:` 아래 `cron: "0 0 * * *"`가 지금 값(하루 1번, 09:00 KST)이다. cron은 **UTC**라 KST에서 9시간을 뺀다. 예: 하루 1번 09:00 KST → `"0 0 * * *"`, 하루 2번 09:00·19:00 KST → `"0 0,10 * * *"`, 08:00·12:00·20:00 KST → `"0 23,3,11 * * *"`. `main`에 커밋하면 다음 예약부터 바뀐다.
+1. PC의 Codex 데스크톱 앱 사이드바 **Scheduled**에서 딜봇 예약 작업의 시간을 바꾼다.
+2. 설정 화면 **실행·기타 → 실행 시간 (dealbot.yml의 cron과 맞추세요)**에서 같은 시간으로 고친다. **+**로 추가하고 **×**로 지운다. 저장할 때 중복을 없애고 정렬한다. **저장**을 누르면 "실행 시간을 …(으)로 바꿨습니다. .github/workflows/dealbot.yml의 cron(UTC 기준)도 같이 바꾸세요."가 뜬다.
+3. GitHub에서 `.github/workflows/dealbot.yml`을 열어 연필 아이콘으로 고친다. 안전망은 PC 실행 **1시간 뒤**로 둔다. `schedule:` 아래 `cron: "0 1 * * *"`가 지금 값(10:00 KST)이다. cron은 **UTC**라 KST에서 9시간을 뺀다. 예: PC 08:00 → 안전망 09:00 KST → `"0 0 * * *"`, PC 07:00 → 안전망 08:00 KST → `"0 23 * * *"`. `main`에 커밋하면 다음 예약부터 바뀐다.
 
-GitHub 예약 실행은 정시에 바로 돌지 않고 몇 분에서 수십 분 늦을 수 있다. 피드의 실행 시각이 09:20처럼 찍혀도 정상이다.
+안전망은 "오늘(설정 시간대 기준) 실행이 이미 있는가"만 본다. 그래서 하루에 PC 실행을 여러 번 걸어도 안전망은 하루 한 번만 의미가 있다. GitHub 예약 실행은 몇 분에서 수십 분 늦을 수 있어서, 안전망 실행 시각이 10:20처럼 찍혀도 정상이다.
 
 참고: daily 묶음은 "자정이 지난 뒤 첫 실행"에 오고, weekly 묶음은 "월요일 0시가 지난 뒤 첫 실행"에 온다. 따라서 첫 실행 시간을 옮기면 묶음이 오는 시간도 같이 옮겨진다. 실행 횟수를 2번 이상으로 늘리면 **하루 묶음**도 쓸 만해진다. 하루 1번일 때는 **즉시**가 묶음과 같은 효과(하루 1통)를 내면서 하루 빠르다.
 
@@ -252,7 +254,7 @@ GitHub 예약 실행은 정시에 바로 돌지 않고 몇 분에서 수십 분 
   - 섹션 제목은 바꾸지 않는다. `## 판단 기준`의 "고정 규칙"은 지우지 않는다. 12,000자를 넘기지 않는다. 시크릿과 개인정보는 쓰지 않는다. 이 규칙은 `python scripts/validate.py`가 검사한다.
   - 손으로 고쳤으면 `## 변경 이력`에 한 줄 남겨 두면 Codex가 맥락을 안다.
   - 플레이북은 **웹 검색**에만 쓰인다. RSS·에픽 소스의 거름망은 여전히 설정 화면의 키워드·제외어다.
-- 웹 검색이 실제로 돌려면 카테고리 **소스**에 **웹 검색 (Codex)**이 체크돼 있고, 저장소 Actions 시크릿에 `OPENAI_API_KEY`가 있어야 한다. 키가 없으면 플레이북도 고쳐지지 않는다. 기본 `points` 카테고리는 웹 검색이 체크돼 있다.
+- 웹 검색과 플레이북 개선은 PC의 Codex 앱 예약 작업이 한다. 카테고리 **소스**에 **웹 검색 (Codex)**이 체크돼 있어야 한다. 기본 `points` 카테고리는 체크돼 있다. PC 실행이 없어 10:00 안전망이 돈 날은 RSS만 수집하고 플레이북도 고쳐지지 않는다. 저장소 시크릿 `OPENAI_API_KEY`(선택, API 별도 과금)가 있으면 안전망도 Actions 안에서 검색과 개선을 한다.
 - 플레이북 외에 [관심사](#관심사-바꾸기)도 검색 순서에 쓰인다. 회고 결과의 `interest_hits`·`interest_miss`를 보고 Codex가 관심 키워드가 들어간 검색어를 더하기도 한다.
 
 ## 알림 규칙 이해하기
@@ -289,25 +291,32 @@ GitHub 예약 실행은 정시에 바로 돌지 않고 몇 분에서 수십 분 
    - 채널의 **받을 우선순위**에 그 카테고리의 우선순위가 체크돼 있는지 본다.
    - 채널이 **켜기** 상태인지 본다.
 4. **오류 N**이 있으면 `data/runs.json`의 `runs[0].errors`를 본다. `notify:ntfy` 같은 항목이 채널 오류다.
-   - "환경변수 없음: DEALBOT_NTFY_TOPIC …": 저장소 Actions 시크릿에 토픽을 넣는다. 새 채널의 시크릿 이름이 `dealbot.yml`의 Notify 단계 `env`에 있는지도 본다.
-   - HTTP 오류: 채널 쪽 문제(웹후크 주소 삭제, 토큰 만료 등)인지 Actions 로그의 Notify 단계에서 본다.
+   - "환경변수 없음: DEALBOT_NTFY_TOPIC …": 저장소 Actions 시크릿에 토픽을 넣는다. 새 채널의 시크릿 이름이 `notify.yml`과 `dealbot.yml`의 Notify 단계 `env`에 있는지도 본다. PC에는 알림 시크릿을 두지 않는다.
+   - HTTP 오류: 채널 쪽 문제(웹후크 주소 삭제, 토큰 만료 등)인지 Actions 로그의 Notify 단계에서 본다. 평소에는 **Actions 탭 → notify**, PC 실행이 없던 날은 **Actions 탭 → dealbot** 로그다.
+6. `codex: run …` 커밋은 있는데 바로 뒤 `actions: notify …` 커밋도 **Actions 탭 → notify** 실행도 없으면 notify가 돌지 않은 것이다. notify는 커밋 메시지가 `codex: run`으로 시작할 때만 돈다. **Actions 탭 → notify → Run workflow**로 손으로 돌리면 대기 중인 알림을 보낸다.
 5. 폰 ntfy 앱이 그 토픽을 구독하고 있는지 본다. 로컬에서 실제로 한 건 보내 확인할 수 있다([손으로 돌려 보기](#손으로-돌려-보기)).
 
 ### 배너가 뜬다
 
-- "딜봇이 아직 한 번도 실행되지 않았습니다. GitHub Actions의 dealbot 워크플로를 한 번 실행하세요(가이드 참고).": `runs.json`이 비어 있다. 워크플로를 한 번도 돌리지 않았거나, 돌렸는데 push가 실패한 것이다. **Actions 탭 → dealbot → Run workflow**로 한 번 돌린다. 처음 연결이면 README "4. 자동 실행 연결"을 따른다.
-- "딜봇이 N시간째 실행되지 않았습니다. GitHub Actions의 dealbot 실행 기록을 확인하세요.": 마지막 실행이 24시간 넘게 지났다. 하루 한 번 도는데 GitHub 예약이 늦으면 다음 실행 직전에 잠깐 뜰 수 있다. 실행이 끝나고 **↻ 게시 데이터 새로고침**을 눌러 사라지면 정상이다. 계속 뜨면 아래 [실행이 멈췄거나 실패했을 때](#실행이-멈췄거나-실패했을-때)를 본다.
+- "딜봇이 아직 한 번도 실행되지 않았습니다. GitHub Actions의 dealbot 워크플로를 한 번 실행하세요(가이드 참고).": `runs.json`이 비어 있다. 정기 실행이 한 번도 돌지 않았거나, 돌았는데 push가 실패한 것이다. 문구는 dealbot 워크플로를 말하지만, 평소 실행은 PC의 Codex 앱 예약 작업이다. 예약 작업에서 지금 실행을 하거나, 급하면 **Actions 탭 → dealbot → Run workflow**로 RSS만이라도 돌린다. 처음 연결이면 README "4. 자동 실행 연결"을 따른다.
+- "딜봇이 N시간째 실행되지 않았습니다. GitHub Actions의 dealbot 실행 기록을 확인하세요.": 마지막 실행이 24시간 넘게 지났다. 하루 한 번 도는데 실행이 조금 늦으면 다음 실행 직전에 잠깐 뜰 수 있다. 실행이 끝나고 **↻ 게시 데이터 새로고침**을 눌러 사라지면 정상이다. 계속 뜨면 아래 [실행이 멈췄거나 실패했을 때](#실행이-멈췄거나-실패했을-때)를 본다.
 
 ### 실행이 멈췄거나 실패했을 때
 
-- 실패하면 GitHub가 메일로 알려 준다. 예약 실행의 실패 메일은 보통 `dealbot.yml`의 cron을 마지막으로 고친 계정으로 간다. 예약이 아예 안 돌면 메일이 오지 않는다. 이때는 피드 배너(24시간)와 월요일 `health` 워크플로의 **[딜봇] 실행 멈춤 감지** 알림(36시간)으로 안다.
-- **Actions 탭 → dealbot**에서 실행 목록을 본다. 실행 하나를 누르면 단계별 로그가 있고, 맨 아래 **Summary**에 "찾은 N건, 새 M건, 알림 K건, 오류: …"와 Codex 보고(검색 결과, 회고)가 나온다.
+피드가 갱신되지 않으면 아래 순서로 본다.
+
+1. **Codex 앱 예약 작업 기록**: PC의 Codex 데스크톱 앱 사이드바 **Scheduled**에서 딜봇 작업의 실행 기록을 본다. 09:00에 돌지 않았다면 PC가 꺼져 있었거나, 잠자기·화면 잠금 상태였거나, Codex 앱이 실행 중이 아니었던 것이다. 돌았는데 실패했으면 그 실행 대화에서 어느 단계(prepare, 검색, collect, publish)에서 멈췄는지 본다. 마지막 줄 `published: 찾은 N건, 새 M건, 오류: …`가 있으면 성공이다.
+2. **`codex: run …` 커밋**: GitHub 저장소의 커밋 목록에 오늘 날짜 `codex: run …` 커밋이 있는지 본다. 없으면 publish(push)가 안 된 것이다. publish는 `data/` 밖에 변경이 있으면 "refusing to publish"로 거부하고, push가 3번 실패하면 "push failed"를 낸다. PC의 git 계정이 push할 수 있는지 본다.
+3. **Actions 로그**: **Actions 탭 → notify**(PC 실행 뒤 알림)와 **Actions 탭 → dealbot**(10:00 안전망)을 본다. dealbot의 **Summary**에 "오늘 이미 실행됨(Codex 앱) - 건너뜀"이 있으면 PC 실행이 있었던 날이라 정상이다. 실행했으면 "찾은 N건, 새 M건, 알림 K건, 오류: …"가 나온다. 이 날의 커밋은 `actions: run …`이다.
+
+- 실패하면 GitHub가 메일로 알려 준다(Actions 워크플로만). PC 예약 작업이 안 돌았으면 메일이 오지 않는다. 그래도 안전망이 RSS를 수집하므로 실행 기록은 남는다. PC와 안전망이 모두 안 돌면 피드 배너(24시간)와 월요일 `health` 워크플로의 **[딜봇] 실행 멈춤 감지** 알림(36시간)으로 안다.
 - 자주 보는 원인:
-  - 정시보다 늦다: GitHub 예약 실행은 몇 분에서 수십 분 늦을 수 있다. 정상이다. 한 번이 통째로 건너뛰어지는 일도 드물게 있다.
-  - **Commit data/ and push** 단계 실패: **Settings → Actions → General → Workflow permissions**가 "Read and write permissions"인지 본다. `main`에 브랜치 보호를 걸었으면 Actions가 push할 수 있게 한다.
-  - Codex 단계가 실패해도 워크플로는 계속 돈다. 이때 `runs.json` 오류에 `search: Codex 검색 단계 실패 (Actions 로그 확인)`이 남는다. OpenAI 사용 한도나 결제 상태를 본다.
-  - 워크플로가 꺼짐: Actions 탭에서 dealbot이 "disabled"로 보이면 **Enable workflow**를 누른다.
-- 급하면 **Actions 탭 → dealbot → Run workflow**로 바로 돌린다. **Codex 웹 검색·플레이북 개선 실행** 체크를 끄면 Codex 검색·플레이북 단계를 건너뛰고 RSS·에픽만 돈다.
+  - PC가 09:00에 잠들어 있었다: 그날은 10:00 안전망이 RSS만 수집한다(웹 검색·플레이북 개선 없음). 정상 동작이다. 매일 그렇다면 PC 전원·잠자기 설정을 바꾸거나 예약 시간을 PC를 쓰는 시간으로 옮긴다([알림 시간·조용한 시간 바꾸기](#알림-시간조용한-시간-바꾸기)).
+  - 예약 작업이 승인 대기로 멈췄다: 권한이 **Full access**가 아니면 네트워크나 `git push`에서 승인을 기다리다 멈춘다. 예약 작업 권한을 **Full access**로, 실행 위치를 **local project**로 바꾼다.
+  - Actions의 **Commit … and push** 단계 실패: **Settings → Actions → General → Workflow permissions**가 "Read and write permissions"인지 본다. `main`에 브랜치 보호를 걸었으면 Actions가 push할 수 있게 한다.
+  - 안전망이 돈 날마다 `runs.json` 오류에 `search: Codex 검색 단계 실패 (Actions 로그 확인)`이 남고, Actions 로그의 **Codex web search** 단계에 "Quota exceeded"가 보인다: 저장소 시크릿 `OPENAI_API_KEY`가 크레딧 없이 남아 있다. 이 키는 구독과 별도인 API 과금용이고 안전망에서만 쓰인다. 쓰지 않으면 **Settings → Secrets and variables → Actions**에서 지운다.
+  - 워크플로가 꺼짐: Actions 탭에서 notify나 dealbot이 "disabled"로 보이면 **Enable workflow**를 누른다.
+- 급하면 PC 터미널에서 [손으로 돌려 보기](#손으로-돌려-보기)의 `local_run.py` 세 단계를 돌리거나(웹 검색 없이 수집), **Actions 탭 → dealbot → Run workflow**를 누른다. 손으로 누른 dealbot은 오늘 실행이 있어도 건너뛰지 않는다.
 
 ### 저장 실패
 
@@ -349,10 +358,12 @@ GitHub 예약 실행은 정시에 바로 돌지 않고 몇 분에서 수십 분 
 - `HTTP 0: …`(연결 실패): 사이트가 내려갔거나 주소가 바뀌었다. 로컬에서 같은 주소가 열리는지 본다.
 - `HTTP 403`, `HTTP 429`: 사이트가 막았다(GitHub Actions의 해외 IP를 막는 국내 사이트도 있다). 딜봇은 우회하지 않는다. 그 소스를 카테고리에서 뺀다.
 - `rss feed '…' is not in config.rss_feeds`: 카테고리가 지운 피드를 가리킨다. 소스 체크를 정리한다.
-- `search=…`: Codex 웹 검색 단계가 실패한 것이다. Actions 로그의 **Codex web search** 단계를 본다. `OPENAI_API_KEY`가 만료됐거나 사용 한도에 걸렸을 수 있다. 계속 실패하면 카테고리에서 **웹 검색 (Codex)**을 끈다.
+- `search=…`: Codex 웹 검색 단계가 실패한 것이다. PC 실행이면 Codex 앱 예약 작업의 실행 기록에서 사유를 본다(검색을 못 하면 `--search-error "사유"`로 기록된다). 안전망 실행이면 Actions 로그의 **Codex web search** 단계를 본다. `OPENAI_API_KEY`가 크레딧 없이 남아 있으면 매일 실패하니 키를 지운다.
 - 피드 주소가 바뀌었는지 로컬에서 `python scripts/sources/rss.py <id> --all`로 확인한다.
 
-### 웹 검색이 안 돈다 (키를 Variables에 넣었다)
+### 안전망에서 웹 검색이 안 돈다 (키를 Variables에 넣었다)
+
+API 키 방식(선택)을 쓸 때만 해당한다. 평소 PC 실행의 웹 검색은 ChatGPT 구독으로 돌아서 이 키와 상관없다.
 
 - 증상: `OPENAI_API_KEY`를 넣었는데 Actions 로그에서 **Codex web search** 단계가 건너뛰어지고, 플레이북도 고쳐지지 않는다.
 - 확인할 곳: **Settings → Secrets and variables → Actions**에서 키가 **Variables** 탭에 있는지 본다. 워크플로는 **Secrets**만 읽는다(`secrets.OPENAI_API_KEY`). 공개 저장소에서 Variables 값은 누구나 볼 수 있으니 키가 노출된 것으로 본다.
@@ -410,7 +421,18 @@ node --test tests/js/app.test.mjs
 - `rss.py | dedupe.py | notify.py`처럼 `filters.py`를 빼면 키워드 검사 없이 게시판 글이 전부 나온다.
 - `DEALBOT_NOW=2026-10-18T09:01:00+09:00`처럼 환경변수를 주면 현재 시각을 바꿔서 볼 수 있다. daily 묶음이 언제 나가는지 확인할 때 쓴다.
 
-**정기 실행을 지금 한 번 돌리기**: 로컬이 아니라 GitHub에서 한다. **Actions 탭 → dealbot → Run workflow**를 누른다. **Codex 웹 검색·플레이북 개선 실행 (OPENAI_API_KEY 필요)**를 체크하면(기본) `OPENAI_API_KEY`가 있을 때 Codex 검색·플레이북 단계까지 돌고, 끄면 RSS·에픽만 돈다. 실제로 `data/`를 커밋하고 알림을 보낸다. 끝나면 실행의 **Summary**에서 결과를 본다.
+**정기 실행을 지금 한 번 돌리기**: 세 가지 방법이 있다. 모두 실제로 `data/`를 커밋하고 알림을 보낸다.
+
+- **Codex 앱(검색 포함)**: Codex 데스크톱 앱의 딜봇 예약 작업에서 지금 실행을 누른다. 또는 Codex 채팅에 `.github/codex/scheduled.md` 내용을 그대로 준다.
+- **PC 터미널(웹 검색 없이)**: 저장소 루트에서 아래 세 줄을 순서대로 돌린다. `prepare`는 `main`을 받고 `.venv`를 준비하고, `collect`는 RSS 수집·검증·회고(`.tmp/review.json`)를 하고, `publish`는 `data/`를 `codex: run …`으로 커밋해 push한다. push되면 Actions `notify`가 알림을 보낸다. `publish`는 `data/` 밖에 고친 파일이 있으면 거부한다.
+
+  ```bash
+  py -3 scripts/local_run.py prepare
+  py -3 scripts/local_run.py collect
+  py -3 scripts/local_run.py publish
+  ```
+
+- **GitHub(안전망과 같음)**: **Actions 탭 → dealbot → Run workflow**를 누른다. 손으로 누르면 오늘 실행이 있어도 돈다. **Codex 웹 검색·플레이북 개선 실행 (OPENAI_API_KEY 필요)** 체크는 `OPENAI_API_KEY`가 있을 때만 의미가 있다. 없으면 RSS·에픽만 돈다. 끝나면 실행의 **Summary**에서 결과를 본다.
 
 **실제 전송 1건 테스트** (실제로 보낸다. 데이터는 바꾸지 않는다):
 
@@ -422,7 +444,7 @@ DEALBOT_NTFY_TOPIC=<내 토픽> python scripts/notify.py --sample --channel ntfy
 
 **UI 로컬로 보기**: 저장소 루트에서 `python -m http.server`를 띄우고 `http://localhost:8000/docs/`를 연다. 가이드는 `http://localhost:8000/docs/guide.html`이다. 토큰이 없으면 로컬 `data/`와 `MANUAL.md`를 읽는다. 저장을 누르면 토큰 창이 뜨고, 토큰을 넣으면 그때부터 GitHub의 `main`을 읽고 저장도 `main`에 커밋한다. 로컬 저장소 이름은 주소로 알 수 없어서 `kanguk2/dealbot`으로 본다.
 
-**하지 말 것**: `python scripts/run_deterministic.py`(`--dry-run` 없이)와 `python scripts/notify.py --since-run`(`--dry-run` 없이)은 `data/`를 바꾼다. `dealbot` 워크플로가 하는 일이므로 로컬 작업 사본에서는 돌리지 않는다. 꼭 봐야 하면 저장소를 임시 폴더에 복사해서 돌린다.
+**하지 말 것**: `python scripts/run_deterministic.py`(`--dry-run` 없이)와 `python scripts/notify.py --since-run`(`--dry-run` 없이)은 `data/`를 바꾼다. 정기 실행(`local_run.py`, `notify`·`dealbot` 워크플로)이 하는 일이므로 따로 돌리지 않는다. 특히 PC에서 `notify.py --since-run`을 돌리면 알림 시크릿이 없어 실패 기록만 남는다. 꼭 봐야 하면 저장소를 임시 폴더에 복사해서 돌린다.
 
 ## 정기 점검
 
@@ -433,8 +455,9 @@ DEALBOT_NTFY_TOPIC=<내 토픽> python scripts/notify.py --sample --channel ntfy
 | 주 1회 | 실행 오류 훑어보기 | 피드 화면 **오류 N** 확인, 또는 `data/runs.json`의 최근 `errors`. 같은 소스가 계속 실패하면 [소스 실패 알림이 온다](#소스-실패-알림이-온다) |
 | 가끔 | 키워드 손보기 | `run_deterministic.py --dry-run`의 `no keyword match` 목록에서 놓친 글이 있는지 본다 |
 | 가끔 | 플레이북 훑어보기 | `data/playbook.md`의 `## 변경 이력`과 `## 피할 출처·패턴`을 보고, 엉뚱하게 배운 것이 있으면 손으로 고친다([검색 요령(플레이북) 보기·고치기](#검색-요령플레이북-보기고치기)) |
-| 실행 시간을 바꿀 때 | `dealbot.yml`의 cron(UTC) 맞추기 | [알림 시간·조용한 시간 바꾸기](#알림-시간조용한-시간-바꾸기) |
-| 월 1회 | OpenAI API 사용량 보기 (`OPENAI_API_KEY`를 넣은 경우만) | platform.openai.com의 Usage에서 이번 달 비용을 본다. 실행 1회에 Codex 호출 2번(검색, 회고)이다. 사용 한도를 정해 두면 넘었을 때 검색 단계만 실패하고 RSS 수집과 알림은 계속 돈다 |
+| 주 1회 | PC 실행이 빠진 날 보기 | 커밋 목록에서 `codex: run …` 대신 `actions: run …`만 있는 날은 PC 실행이 없어 안전망이 돈 날이다. 잦으면 PC 잠자기 설정이나 예약 시간을 바꾼다 |
+| 실행 시간을 바꿀 때 | Codex 앱 예약 시간, 설정 **실행 시간**, `dealbot.yml`의 cron(UTC) 같이 바꾸기 | [알림 시간·조용한 시간 바꾸기](#알림-시간조용한-시간-바꾸기) |
+| 월 1회 | OpenAI API 사용량 보기 (`OPENAI_API_KEY`를 넣은 경우만) | platform.openai.com의 Usage에서 이번 달 비용을 본다. 안전망 실행 1회에 Codex 호출 2번(검색, 회고)이다. PC 실행은 ChatGPT 구독이라 여기에 잡히지 않는다. 크레딧이 없으면 키를 지운다 |
 | 가끔 | 관심 키워드 정리 | 설정 **관심사**에서 더는 원하지 않는 키워드를 지운다. **☆ 관심**을 풀어도 키워드는 남기 때문이다 |
 
 ## 용어
@@ -454,8 +477,11 @@ DEALBOT_NTFY_TOPIC=<내 토픽> python scripts/notify.py --sample --channel ntfy
 | seen | 중복 판정 기록(`data/seen.json`). 같은 카테고리·같은 제목·같은 가격이면 같은 딜로 보고 30일 동안 다시 잡지 않는다. 상태의 `seen`과는 다른 것이다 |
 | 실행 기록 | `data/runs.json`. 실행마다 찾음·새 딜·알림 건수와 오류. 최근 50회 |
 | 조용한 시간 | 즉시 알림을 미루는 시간대 |
-| 시크릿 | 토큰·웹후크·토픽·`OPENAI_API_KEY` 같은 비밀값. 저장소에 두지 않고 GitHub Actions 시크릿(**Settings → Secrets and variables → Actions**)에만 둔다 |
-| 정기 실행 워크플로 | GitHub Actions `dealbot`(`.github/workflows/dealbot.yml`). 매일 09:00 KST에 수집·알림을 돌리고, `OPENAI_API_KEY`가 있으면 웹 검색과 플레이북 개선을 Codex(`openai/codex-action`)에 맡긴다. 예전의 Codex Automation과 백업 실행기 `deterministic-run`을 대신한다 |
+| 시크릿 | 토큰·웹후크·토픽·`OPENAI_API_KEY` 같은 비밀값. 저장소와 PC에 두지 않고 GitHub Actions 시크릿(**Settings → Secrets and variables → Actions**)에만 둔다 |
+| Codex 앱 예약 작업 | 정기 실행의 본체. PC의 Codex 데스크톱 앱(ChatGPT 구독)이 매일 09:00 `.github/codex/scheduled.md`대로 웹 검색·수집·플레이북 개선을 하고 `codex: run …`을 push한다 |
+| `local_run.py` | 예약 작업이 부르는 PC 실행 도우미. `prepare`(main 받기), `collect`(수집·검증·회고), `publish`(`data/` 커밋·push) |
+| notify 워크플로 | GitHub Actions `notify`(`.github/workflows/notify.yml`). `codex: run …` push를 받아 알림을 보내고 `actions: notify …`를 커밋한다 |
+| 안전망 (dealbot 워크플로) | GitHub Actions `dealbot`(`.github/workflows/dealbot.yml`). 매일 10:00 KST에 돌아 오늘 실행이 없으면 RSS만 수집하고 알림을 보낸다. `OPENAI_API_KEY`(선택, API 별도 과금)가 있으면 검색과 플레이북 개선도 한다 |
 | 관심사 | `data/interests.json`. 관심 키워드(`terms`)와 **☆ 관심**으로 저장한 딜(`saved`). 피드의 관심 딜·모아보기 순서와 Codex 검색 순서에 쓰인다 |
 | 대표 딜 / 관심 딜 | 피드 기본 보기 맨 위의 최대 4건. 최근 실행 딜(`feed.json`의 `recent`, 최근 60건)에서 고른다. 관심 키워드에 맞는 딜이 있으면 관심 딜이 된다 |
 | 모아보기 | 피드 기본 보기의 고정 링크 묶음. `data/links.json` |

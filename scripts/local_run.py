@@ -51,13 +51,15 @@ def prepare() -> int:
     sh("git", "pull", "--rebase", "--autostash")
     sh(VENV_PY, "-m", "pip", "install", "-q", "-r", "requirements.txt")
     TMP.mkdir(exist_ok=True)
-    for stale in ("search.json", "review.json"):
+    for stale in ("search.json", "review.json", "validate_failed"):
         (TMP / stale).unlink(missing_ok=True)
     print("ready: write web-search candidates to .tmp/search.json (JSON array)")
     return 0
 
 
 def collect(search_error: str | None) -> int:
+    (TMP / "validate_failed").unlink(missing_ok=True)  # a flag left by an earlier failed day must not leak
+    TMP.mkdir(exist_ok=True)
     args = ["scripts/run_deterministic.py"]
     search = TMP / "search.json"
     if search.exists():
@@ -114,6 +116,9 @@ def publish() -> int:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # Korean output on Windows consoles
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("step", choices=["prepare", "collect", "publish"])
     ap.add_argument("--search-error", help="record why web search could not run")

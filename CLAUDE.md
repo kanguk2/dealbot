@@ -4,7 +4,7 @@
 
 - 설계 원본: [`SPEC.md`](SPEC.md). 사용자가 작성했고 역할 분담, 스키마, 실행 흐름, 마일스톤이 들어 있다.
 - 사용자용 설치·운영 문서: [`README.md`](README.md)
-- Codex 실행 지침: [`CODEX.md`](CODEX.md). 정기 실행은 GitHub Actions `dealbot.yml`이 하고, Codex(`openai/codex-action`)는 2단계 검색·6단계 회고만 맡는다(프롬프트 `.github/codex/`).
+- Codex 실행 지침: [`CODEX.md`](CODEX.md). 정기 실행은 **PC의 Codex 앱 예약 작업(ChatGPT 구독)**이 `.github/codex/scheduled.md` + `scripts/local_run.py`로 하고, 알림은 push 후 `notify.yml`, PC가 꺼진 날은 10:00 `dealbot.yml` 안전망이 한다.
 - 사용 설명서: [`MANUAL.md`](MANUAL.md). 상황별 사용법이다. `manual-writer` 서브에이전트만 고친다(2절 4번).
 - 서브에이전트: `.claude/agents/manual-writer.md`(설명서), `.claude/agents/test-runner.md`(테스트)
 
@@ -13,7 +13,7 @@
 | 누가 | 무엇을 | 건드리는 곳 |
 | --- | --- | --- |
 | Claude (개발) | 코드·UI·스키마·문서 구현과 수정 | `docs/`, `scripts/`, `schemas/`, `*.md`, `.github/`, `requirements.txt` |
-| GitHub Actions `dealbot.yml` + Codex (운영) | 하루 1회(09:00 KST) 수집·알림 실행, Codex가 웹 검색·플레이북 개선 | `data/feed.json`, `seen.json`, `runs.json`(스크립트를 통해), `data/playbook.md`(직접, CODEX.md 6단계 규칙) |
+| PC Codex 앱 예약 작업(구독) + GitHub Actions (운영) | 매일 09:00 PC에서 검색·수집·학습 후 push → `notify.yml` 알림, 10:00 `dealbot.yml` 안전망 | `data/feed.json`, `seen.json`, `runs.json`(스크립트를 통해), `data/playbook.md`(직접, CODEX.md 6단계 규칙) |
 | 사용자 (웹 UI) | 설정 편집, 딜 상태 변경 | `data/config.json`, `data/notifiers.json`, `feed.json`의 `status` |
 
 - Claude는 `data/` 파일의 **기본값과 구조만** 바꾼다. 운영 중 쌓인 데이터(feed, seen, runs)를 지우거나 다시 쓰지 않는다. 스키마가 바뀌어 마이그레이션이 필요하면 스크립트로 하고 PR에 적는다.
@@ -65,7 +65,8 @@
 | 알림 채널 추가 | `scripts/notifiers/<type>.py`, `notifiers.schema.json`의 type enum, `app.js`의 `CHANNEL_TYPES`, README 시크릿 표, 워크플로 env |
 | 소스 추가 | `scripts/sources/<name>.py`(`fetch(config, arg, since)`), `app.js`의 `sourceOptions`/`sourceName`, README의 Codex 도메인 허용 목록 |
 | 실행 순서 | `CODEX.md`, `.github/workflows/dealbot.yml`, `.github/codex/*.md`, README "자동 실행 연결" |
-| 실행 시간 | `dealbot.yml`의 cron(UTC), `data/config.json` `schedule.times`(KST), README |
+| 실행 시간 | Codex 앱 예약 작업 시간(사용자 PC), `data/config.json` `schedule.times`(KST), `dealbot.yml` 안전망 cron(UTC, 1시간 뒤), README |
+| PC 실행 절차 | `.github/codex/scheduled.md`, `scripts/local_run.py`, CODEX.md 머리말, `notify.yml`의 `codex: run` 커밋 메시지 조건 |
 | 사용자 관심사 (`interests.json`) | `docs/app.js` picks·☆ 관심·설정 관심사, `review_run` interest findings, CODEX.md 2·6단계, `.github/codex/search.md` |
 | feed.json 구조 (`items`/`pending`/`bought`) | `run_deterministic.replace_feed`, `notify.run_since`/`prune_pending`, `docs/app.js` 피드·통계, `tests/test_pipeline.py` |
 | 플레이북 섹션·한도 | `data/playbook.md`, `review_run.PLAYBOOK_SECTIONS`/`PLAYBOOK_LIMIT`, CODEX.md 6단계 |
@@ -114,7 +115,8 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - **설정 화면에 GitHub 연결란 없음**: 사용자 요청. 저장소는 URL에서 알아내고, PAT는 처음 저장할 때 대화상자로 한 번 받는다. 공개 Pages라서 토큰을 페이지에 넣을 수 없다.
 - **피드 자동 갱신**: 3분마다, 그리고 탭에 돌아올 때 runs.json을 확인한다.
 - **가이드 탭**: `docs/guide.html`이 MANUAL.md를 렌더링한다. 외부 라이브러리 없이 `app.js`의 작은 마크다운 렌더러를 쓴다. MANUAL.md에 새 문법(중첩 표, 이미지 등)을 쓰면 렌더러와 테스트도 같이 고친다.
-- **정기 실행 = GitHub Actions + codex-action**: Codex cloud 예약 작업은 main에 무인 push를 못 한다(2026-10 조사). `dealbot.yml`은 job 3개(search → collect → learn)다. codex-action은 drop-sudo 때문에 job당 1번만 실행된다. 웹 검색은 `codex-args: ["-c", "web_search=\"live\""]`로 켠다(`--search`는 exec 옵션이 아니라 실패한다). 하루 1회 09:00 KST(사용자 요청), 그래서 기본 카테고리 priority는 instant다.
+- **정기 실행 = PC의 Codex 앱 예약 작업(ChatGPT 구독)**: 사용자 요청(2026-10-18, "구독 형태로"). 참고한 flight-price-tracker도 PC에서 수집하고 main에 push한다. PC에서는 판단이 필요 없는 일을 `scripts/local_run.py`가 하고, 알림 시크릿은 GitHub에만 두어 `notify.yml`이 `codex: run` 커밋 push를 받아 보낸다. `dealbot.yml`은 10:00 안전망이다(`ran_today.py`로 오늘 실행했으면 건너뜀). API 키 Codex 경로는 선택 사항으로 남겼다.
+- **(이전 결정) GitHub Actions + codex-action**: Codex cloud 예약 작업은 main에 무인 push를 못 한다(2026-10 조사). `dealbot.yml`은 job 3개(search → collect → learn)다. codex-action은 drop-sudo 때문에 job당 1번만 실행된다. 웹 검색은 `codex-args: ["-c", "web_search=\"live\""]`로 켠다(`--search`는 exec 옵션이 아니라 실패한다). 하루 1회 09:00 KST(사용자 요청), 그래서 기본 카테고리 priority는 instant다.
 - **OPENAI_API_KEY는 Secrets**에 둔다. Variables는 마스킹되지 않아 공개 로그에 노출된다.
 - **Pages 소스**: 사용자가 `main` / 루트로 켰다. 루트 `index.html`이 `docs/`로 넘겨 준다. `/docs` 소스로 바꿔도 동작한다.
 - **게임 카테고리 제외**: 사용자 요청(2026-10-17). 기본 카테고리는 `points`(포인트·적립) 하나다. `epic_free.py`는 선택 소스로 남겨 두었다.
@@ -139,6 +141,7 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - 2026-10-17 · claude/m1-scaffold · PR #1 · M1 뼈대 전체 구현, 게임 카테고리 제외, CLAUDE.md 작성 · Python 파이프라인·ntfy 실전송·UI 렌더링 확인, 다른 채널 실전송은 미검증
 - 2026-10-17 · claude/m1-scaffold · PR #1 · manual-writer 서브에이전트로 MANUAL.md 첫 작성. 서브에이전트가 찾은 문제 수정(ntfy·Pushover·카카오 "외 N건" 누락, 워크플로 env 3개 누락, README 미리보기에 filters.py 누락) · 35건 메시지로 넘침 문구 확인
 - 2026-10-17 · claude/m1-scaffold · PR #1 · 설정에서 GitHub 연결란 제거(첫 저장 때 토큰 대화상자), 피드 실행마다 교체·자동 갱신, 마감 필터(min_days_left), 검색 플레이북 자기개선(review_run.py), 가이드 탭, 테스트 스위트(Python 52·JS 10)와 tests.yml · 뮤테이션 확인으로 테스트가 실제로 잡는 것 확인
+- 2026-10-18 · main · 구독 방식으로 전환: PC Codex 앱 예약 작업 + `local_run.py` + `notify.yml`, `dealbot.yml`은 10:00 안전망. PC에서 prepare→collect→publish를 실제로 돌려 push(+6 new)하고, notify.yml이 자동 실행된 것까지 확인했다. 사용자는 Codex 앱 예약 작업을 아직 만들지 않았다
 - 2026-10-17 · main · 기본 화면 대표/관심 딜 + 모아보기(links.json), ☆ 관심(interests.json) 학습, GitHub Actions `dealbot.yml`(Codex 검색·학습) + `health.yml`, 하루 1회 · test-runner: Python 74·JS 33. 실제 실행 2회: 첫 번째에서 `--search` 오류와 job당 1회 제한을 찾아 job 3개로 분리했다. 두 번째는 흐름은 정상이었지만 OpenAI API `Quota exceeded`(결제·크레딧 필요)로 검색이 안 됐다
 - 2026-10-17 · main · PR 없이 main 직접 push로 전환, test-runner 서브에이전트 추가 · 사용자 요청
 - 2026-10-17 · main · UI를 Flight Watch(gagulproject.github.io/flight-price-tracker) 스타일로 재디자인(히어로 통계, 딜 찾기 패널, 카드 그리드, 실행 기록 차트), 무시가 대기 중 묶음 알림에 반영 안 되던 버그 수정, 더 보기 hidden 버그 수정 · test-runner: Python 53·JS 18 통과, 500/1280px 화면 확인. 샀음 표시는 묶음 알림을 막지 않는다(무시만 막음)
