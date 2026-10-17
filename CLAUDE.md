@@ -135,3 +135,5 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - 2026-10-17 · claude/m1-scaffold · PR #1 · M1 뼈대 전체 구현, 게임 카테고리 제외, CLAUDE.md 작성 · Python 파이프라인·ntfy 실전송·UI 렌더링 확인, 다른 채널 실전송은 미검증
 - 2026-10-17 · claude/m1-scaffold · PR #1 · manual-writer 서브에이전트로 MANUAL.md 첫 작성. 서브에이전트가 찾은 문제 수정(ntfy·Pushover·카카오 "외 N건" 누락, 워크플로 env 3개 누락, README 미리보기에 filters.py 누락) · 35건 메시지로 넘침 문구 확인
 - 2026-10-17 · claude/m1-scaffold · PR #1 · 설정에서 GitHub 연결란 제거(첫 저장 때 토큰 대화상자), 피드 실행마다 교체·자동 갱신, 마감 필터(min_days_left), 검색 플레이북 자기개선(review_run.py), 가이드 탭, 테스트 스위트(Python 52·JS 10)와 tests.yml · 뮤테이션 확인으로 테스트가 실제로 잡는 것 확인
+- 2026-10-17 · main · PR 없이 main 직접 push로 전환, test-runner 서브에이전트 추가 · 사용자 요청
+- 2026-10-17 · main · UI를 Flight Watch(gagulproject.github.io/flight-price-tracker) 스타일로 재디자인(히어로 통계, 딜 찾기 패널, 카드 그리드, 실행 기록 차트), 무시가 대기 중 묶음 알림에 반영 안 되던 버그 수정, 더 보기 hidden 버그 수정 · test-runner: Python 53·JS 18 통과, 500/1280px 화면 확인. 샀음 표시는 묶음 알림을 막지 않는다(무시만 막음)
