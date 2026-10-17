@@ -12,7 +12,7 @@
 | 누가 | 무엇을 | 건드리는 곳 |
 | --- | --- | --- |
 | Claude (개발) | 코드·UI·스키마·문서 구현과 수정 | `docs/`, `scripts/`, `schemas/`, `*.md`, `.github/`, `requirements.txt` |
-| Codex Automation (운영) | 하루 2~4회 수집·알림 실행 | `data/feed.json`, `seen.json`, `runs.json`만 (스크립트를 통해) |
+| Codex Automation (운영) | 하루 2~4회 수집·알림 실행, 검색 플레이북 개선 | `data/feed.json`, `seen.json`, `runs.json`(스크립트를 통해), `data/playbook.md`(직접, CODEX.md 6단계 규칙) |
 | 사용자 (웹 UI) | 설정 편집, 딜 상태 변경 | `data/config.json`, `data/notifiers.json`, `feed.json`의 `status` |
 
 - Claude는 `data/` 파일의 **기본값과 구조만** 바꾼다. 운영 중 쌓인 데이터(feed, seen, runs)를 지우거나 다시 쓰지 않는다. 스키마가 바뀌어 마이그레이션이 필요하면 스크립트로 하고 PR에 적는다.
@@ -73,10 +73,25 @@
 | 알림 채널 추가 | `scripts/notifiers/<type>.py`, `notifiers.schema.json`의 type enum, `app.js`의 `CHANNEL_TYPES`, README 시크릿 표, 워크플로 env |
 | 소스 추가 | `scripts/sources/<name>.py`(`fetch(config, arg, since)`), `app.js`의 `sourceOptions`/`sourceName`, README의 Codex 도메인 허용 목록 |
 | 실행 순서 | `CODEX.md`, README 프롬프트, `.github/workflows/deterministic.yml` |
+| feed.json 구조 (`items`/`pending`/`bought`) | `run_deterministic.replace_feed`, `notify.run_since`/`prune_pending`, `docs/app.js` 피드·통계, `tests/test_pipeline.py` |
+| 플레이북 섹션·한도 | `data/playbook.md`, `review_run.PLAYBOOK_SECTIONS`/`PLAYBOOK_LIMIT`, CODEX.md 6단계 |
+| 사용자에게 보이는 동작 | `MANUAL.md` (manual-writer 서브에이전트), 가이드 탭은 MANUAL.md를 그대로 렌더링한다 |
 
 ## 4. 테스트 방법
 
-운영 데이터(`data/`)를 더럽히지 않도록, 상태가 바뀌는 테스트는 **저장소를 임시 폴더에 복사해서** 돌린다. `DEALBOT_NOW`로 현재 시각을 바꿀 수 있다.
+**자동 테스트가 기본이다.** 기능을 추가하거나 고치면 테스트도 같이 추가하고, 커밋 전에 전부 돌린다. 사용자 요청(2026-10-17): "말한 것들이 제대로 동작하는지 테스트를 작성하고 돌린다."
+
+```bash
+python -m unittest discover -s tests        # Python 52+개 (단위 + data 임시 폴더 end-to-end)
+node --test tests/js/app.test.mjs           # UI 로직 (검증기, 마크다운, 통계 등)
+python scripts/validate.py                  # 커밋된 data/ 검증
+```
+
+- GitHub Actions `tests.yml`이 push·PR마다 같은 것을 돌린다(`data/`만 바뀐 봇 커밋은 제외).
+- 테스트용 장치: `DEALBOT_DATA_DIR`(임시 data 폴더), `DEALBOT_NOW`(현재 시각 고정), `DEALBOT_HTTP_LOG`(HTTP를 보내지 않고 파일에 기록). 새 테스트는 `tests/helpers.py`의 `DataDirTest`를 쓴다.
+- 테스트가 실제로 잡는지 의심되면 코드를 일부러 망가뜨려 실패하는지 확인한다(뮤테이션 확인).
+
+수동 확인용 명령은 아래와 같다. 상태가 바뀌는 수동 테스트는 **저장소를 임시 폴더에 복사해서** 돌린다.
 
 ```bash
 python scripts/validate.py
@@ -99,6 +114,13 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - **M1 뼈대** (PR #1, 브랜치 `claude/m1-scaffold`): 스키마 5종, 스크립트, 소스 2종, 알림 7종, Pages UI, CODEX.md, README, 백업 워크플로
 
 ### 스펙과 다르게 정한 것 (이유 포함)
+- **피드는 실행마다 통째로 교체**: 사용자 선택(2026-10-17). `feed.items`는 최신 실행의 새 딜만 담는다. 묶음 알림은 `feed.pending` 대기열, 샀음 기록은 `feed.bought`(200건)로 남긴다. 이전 페이지의 무시·샀음은 `runs[0].user_feedback`로 넘어가 검색 학습에 쓰인다.
+- **마감 필터**: 사용자 요청. `config.min_days_left`(기본 1)일 이내 마감과 이미 끝난 딜은 수집·표시·알림 모두에서 제외한다. 마감일을 모르면 통과시킨다.
+- **검색 플레이북 자기개선**: 사용자 요청. `data/playbook.md`를 Codex가 매 실행 2단계에서 읽고 6단계에서 `review_run.py` 근거로 최대 3곳 고친다. CODEX.md는 고정 규칙이고, 플레이북이 학습되는 부분이다.
+- **설정 화면에 GitHub 연결란 없음**: 사용자 요청. 저장소는 URL에서 알아내고, PAT는 처음 저장할 때 대화상자로 한 번 받는다. 공개 Pages라서 토큰을 페이지에 넣을 수 없다.
+- **피드 자동 갱신**: 3분마다, 그리고 탭에 돌아올 때 runs.json을 확인한다.
+- **가이드 탭**: `docs/guide.html`이 MANUAL.md를 렌더링한다. 외부 라이브러리 없이 `app.js`의 작은 마크다운 렌더러를 쓴다. MANUAL.md에 새 문법(중첩 표, 이미지 등)을 쓰면 렌더러와 테스트도 같이 고친다.
+- **Pages 소스**: 사용자가 `main` / 루트로 켰다. 루트 `index.html`이 `docs/`로 넘겨 준다. `/docs` 소스로 바꿔도 동작한다.
 - **게임 카테고리 제외**: 사용자 요청(2026-10-17). 기본 카테고리는 `points`(포인트·적립) 하나다. `epic_free.py`는 선택 소스로 남겨 두었다.
 - 뽐뿌 이벤트 게시판 RSS가 2024년 이후 갱신되지 않아 `ppomppu_coupon`(쿠폰 게시판)으로 바꿨다. `ppomppu_hotdeal`, `ruliweb_hotdeal`은 등록만 해 두었다.
 - 수집 단계(소스 → dedupe → filter → 기록)를 `run_deterministic.py`로 묶었다. Codex는 웹 검색 결과를 `.tmp/search.json`에 쓰고 `--extra`로 넘긴다.
@@ -108,7 +130,8 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - `validate.py`는 config·notifiers에서 token, webhook, secret, password, api_key 같은 단어를 금지한다. feed·seen·runs는 자격 증명처럼 생긴 값만 검사한다(딜 제목의 오탐을 피하려고).
 
 ### 남은 일
-- **M2·M3 (사용자)**: README "처음 설정"과 "자동 실행" 참고. Pages 켜기, PAT, ntfy, Codex 환경·시크릿·Automation 등록
+- **M2·M3 (사용자)**: README "처음 설정"과 "자동 실행" 참고. Pages는 켜짐(main/루트). PAT, ntfy, Codex 환경·시크릿·Automation 등록이 남음
+- 아이디어: 설정 화면에서 플레이북 읽기/편집, 피드에서 "봤음" 표시
 - **M4 (필요할 때)**: 검색 경로 켜기(도메인 허용 목록 확장), 카카오·이메일 활성화, 통계 고도화
 - **미검증**: ntfy 외 채널의 실제 전송, Pages에서 PAT로 커밋하는 흐름(머지 후 사용자 확인 필요)
 
@@ -119,3 +142,4 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - 2026-10-17 · main · SPEC.md 추가(원본 파일명 `딜봇(DealBot) 구현 스펙 — Codex 작업 지시서.md`에서 이름 변경)
 - 2026-10-17 · claude/m1-scaffold · PR #1 · M1 뼈대 전체 구현, 게임 카테고리 제외, CLAUDE.md 작성 · Python 파이프라인·ntfy 실전송·UI 렌더링 확인, 다른 채널 실전송은 미검증
 - 2026-10-17 · claude/m1-scaffold · PR #1 · manual-writer 서브에이전트로 MANUAL.md 첫 작성. 서브에이전트가 찾은 문제 수정(ntfy·Pushover·카카오 "외 N건" 누락, 워크플로 env 3개 누락, README 미리보기에 filters.py 누락) · 35건 메시지로 넘침 문구 확인
+- 2026-10-17 · claude/m1-scaffold · PR #1 · 설정에서 GitHub 연결란 제거(첫 저장 때 토큰 대화상자), 피드 실행마다 교체·자동 갱신, 마감 필터(min_days_left), 검색 플레이북 자기개선(review_run.py), 가이드 탭, 테스트 스위트(Python 52·JS 10)와 tests.yml · 뮤테이션 확인으로 테스트가 실제로 잡는 것 확인

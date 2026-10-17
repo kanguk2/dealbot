@@ -10,16 +10,20 @@
 
 ```
 dealbot/
-├── docs/            GitHub Pages: 피드(index.html), 설정(settings.html), app.js, style.css
+├── docs/            GitHub Pages: 피드(index.html), 설정(settings.html), 가이드(guide.html = MANUAL.md), app.js, style.css
+├── index.html       Pages를 저장소 루트로 켰을 때 docs/로 넘겨 준다
+├── tests/           Python unittest + node:test (GitHub Actions tests.yml)
 ├── data/            상태. Codex는 이 폴더만 커밋한다
 │   ├── config.json      분야·키워드·소스·주기 (UI가 편집)
 │   ├── notifiers.json   알림 채널 (UI가 편집, 토큰 없음)
-│   ├── feed.json        잡힌 딜 (최근 500건)
+│   ├── feed.json        최신 실행 결과(items, 매 실행 교체) + 알림 대기열(pending) + 샀음 기록(bought)
 │   ├── seen.json        중복 판정 키 (30일)
-│   └── runs.json        실행 로그 (최근 50회)
+│   ├── runs.json        실행 로그 (최근 50회, 걸러진 이유·사용자 피드백 포함)
+│   └── playbook.md      검색 플레이북. Codex가 읽고, 매 실행 후 스스로 개선한다
 ├── scripts/
 │   ├── run_deterministic.py  소스 실행 → 중복 제거 → 필터 → data/ 기록 (한 번의 수집)
 │   ├── dedupe.py · filters.py · validate.py · notify.py
+│   ├── review_run.py    실행 회고 (플레이북 개선 근거)
 │   ├── sources/         epic_free.py, rss.py
 │   └── notifiers/       채널 플러그인 (파일 하나 = 채널 하나)
 ├── schemas/         JSON Schema (UI와 validate.py가 같이 씀)
