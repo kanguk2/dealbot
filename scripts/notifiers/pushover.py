@@ -13,7 +13,7 @@ class Pushover(Notifier):
     required_env = ("DEALBOT_PUSHOVER_TOKEN", "DEALBOT_PUSHOVER_USER")
 
     def render(self, msg: Message) -> dict:
-        body = Message(header="", items=msg.items, body=msg.body,
+        body = Message(header="", items=msg.items, body=msg.body, footer=msg.footer,
                        include_summary=msg.include_summary).text().lstrip("\n")
         payload = {"title": msg.header[:250], "message": (body or msg.header)[:1024],
                    "priority": PRIORITY.get(msg.priority, 0)}

@@ -34,8 +34,8 @@ Python 3.10 이상.
 ```bash
 pip install -r requirements.txt
 
-# 소스 → 중복 제거 → 알림 미리보기 (아무것도 보내거나 쓰지 않음)
-python scripts/sources/rss.py --all | python scripts/dedupe.py | python scripts/notify.py --dry-run
+# 소스 → 중복 제거 → 필터 → 알림 미리보기 (아무것도 보내거나 쓰지 않음)
+python scripts/sources/rss.py --all | python scripts/dedupe.py | python scripts/filters.py | python scripts/notify.py --dry-run
 
 # 채널별 메시지 형식 미리보기 (꺼진 채널 포함)
 python scripts/notify.py --dry-run --sample

@@ -20,7 +20,7 @@ class Ntfy(Notifier):
         return [] if self.topic else ["DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"]
 
     def render(self, msg: Message) -> dict:
-        body = Message(header="", items=msg.items, body=msg.body,
+        body = Message(header="", items=msg.items, body=msg.body, footer=msg.footer,
                        include_summary=msg.include_summary).text().lstrip("\n")
         payload = {"topic": self.topic or "$DEALBOT_NTFY_TOPIC", "title": msg.header,
                    "message": body[:3900] or msg.header,
