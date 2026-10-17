@@ -137,6 +137,16 @@ button.add { margin: 4px 0; }
 .result.error { color: var(--danger); }
 .result.ok { color: var(--ok); }
 
+.tokdlg {
+  width: min(420px, calc(100% - 32px)); padding: 16px;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 12px;
+}
+.tokdlg::backdrop { background: rgba(0, 0, 0, .45); }
+.tokdlg p { margin: 6px 0; font-size: 14px; }
+.tokdlg input { margin: 8px 0 4px; }
+.tokdlg .row { margin-top: 10px; justify-content: flex-end; }
+
 #toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
   max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 10px;

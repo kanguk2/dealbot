@@ -70,7 +70,9 @@ GitHub **Settings → Developer settings → Fine-grained personal access tokens
 - Permissions: **Contents: Read and write** (나머지는 없음)
 - Expiration: 90일
 
-설정 화면 맨 아래 "GitHub 연결"에 붙여 넣고 **저장·확인**을 누른다. 토큰은 그 브라우저의 localStorage에만 저장된다. 아무 설정이나 한 번 저장해서 `ui: update config` 커밋이 생기는지 확인한다.
+설정 화면에는 GitHub 항목이 없다. 저장소 주소는 페이지 URL에서 알아낸다. 처음 무언가를 저장할 때(설정 **저장**, 피드의 **샀음**·**무시**) 토큰 입력 창이 한 번 뜬다. 여기에 붙여 넣으면 그 브라우저의 localStorage에 기억된다. 토큰이 만료되거나 거절되면 다음 저장 때 창이 다시 뜬다. 아무 설정이나 한 번 저장해서 `ui: update config` 커밋이 생기는지 확인한다.
+
+> 토큰을 페이지에 미리 넣어 둘 수는 없다. Pages는 공개 사이트라서, 넣어 두면 누구나 그 토큰으로 저장소에 쓸 수 있다.
 
 ### 3. 알림 채널
 
