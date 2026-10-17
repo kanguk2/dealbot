@@ -4,7 +4,7 @@
 
 - 설계 원본: [`SPEC.md`](SPEC.md). 사용자가 작성했고 역할 분담, 스키마, 실행 흐름, 마일스톤이 들어 있다.
 - 사용자용 설치·운영 문서: [`README.md`](README.md)
-- Codex Automation 실행 지침: [`CODEX.md`](CODEX.md). Codex가 매 실행마다 읽는다.
+- Codex 실행 지침: [`CODEX.md`](CODEX.md). 정기 실행은 GitHub Actions `dealbot.yml`이 하고, Codex(`openai/codex-action`)는 2단계 검색·6단계 회고만 맡는다(프롬프트 `.github/codex/`).
 - 사용 설명서: [`MANUAL.md`](MANUAL.md). 상황별 사용법이다. `manual-writer` 서브에이전트만 고친다(2절 4번).
 - 서브에이전트: `.claude/agents/manual-writer.md`(설명서), `.claude/agents/test-runner.md`(테스트)
 
@@ -13,7 +13,7 @@
 | 누가 | 무엇을 | 건드리는 곳 |
 | --- | --- | --- |
 | Claude (개발) | 코드·UI·스키마·문서 구현과 수정 | `docs/`, `scripts/`, `schemas/`, `*.md`, `.github/`, `requirements.txt` |
-| Codex Automation (운영) | 하루 2~4회 수집·알림 실행, 검색 플레이북 개선 | `data/feed.json`, `seen.json`, `runs.json`(스크립트를 통해), `data/playbook.md`(직접, CODEX.md 6단계 규칙) |
+| GitHub Actions `dealbot.yml` + Codex (운영) | 하루 1회(09:00 KST) 수집·알림 실행, Codex가 웹 검색·플레이북 개선 | `data/feed.json`, `seen.json`, `runs.json`(스크립트를 통해), `data/playbook.md`(직접, CODEX.md 6단계 규칙) |
 | 사용자 (웹 UI) | 설정 편집, 딜 상태 변경 | `data/config.json`, `data/notifiers.json`, `feed.json`의 `status` |
 
 - Claude는 `data/` 파일의 **기본값과 구조만** 바꾼다. 운영 중 쌓인 데이터(feed, seen, runs)를 지우거나 다시 쓰지 않는다. 스키마가 바뀌어 마이그레이션이 필요하면 스크립트로 하고 PR에 적는다.
@@ -64,7 +64,9 @@
 | 스키마 키워드 | `docs/app.js`의 미니 검증기는 일부 키워드만 지원한다(파일 안 주석 참고). 새 키워드를 쓰면 검증기도 구현한다 |
 | 알림 채널 추가 | `scripts/notifiers/<type>.py`, `notifiers.schema.json`의 type enum, `app.js`의 `CHANNEL_TYPES`, README 시크릿 표, 워크플로 env |
 | 소스 추가 | `scripts/sources/<name>.py`(`fetch(config, arg, since)`), `app.js`의 `sourceOptions`/`sourceName`, README의 Codex 도메인 허용 목록 |
-| 실행 순서 | `CODEX.md`, README 프롬프트, `.github/workflows/deterministic.yml` |
+| 실행 순서 | `CODEX.md`, `.github/workflows/dealbot.yml`, `.github/codex/*.md`, README "자동 실행 연결" |
+| 실행 시간 | `dealbot.yml`의 cron(UTC), `data/config.json` `schedule.times`(KST), README |
+| 사용자 관심사 (`interests.json`) | `docs/app.js` picks·☆ 관심·설정 관심사, `review_run` interest findings, CODEX.md 2·6단계, `.github/codex/search.md` |
 | feed.json 구조 (`items`/`pending`/`bought`) | `run_deterministic.replace_feed`, `notify.run_since`/`prune_pending`, `docs/app.js` 피드·통계, `tests/test_pipeline.py` |
 | 플레이북 섹션·한도 | `data/playbook.md`, `review_run.PLAYBOOK_SECTIONS`/`PLAYBOOK_LIMIT`, CODEX.md 6단계 |
 | 사용자에게 보이는 동작 | `MANUAL.md` (manual-writer 서브에이전트), 가이드 탭은 MANUAL.md를 그대로 렌더링한다 |

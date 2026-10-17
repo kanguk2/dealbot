@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "interests.schema.json",
+  "title": "DealBot user interests: saved deals (☆ 관심) and interest terms. Written by the web UI, read by the page and by Codex.",
+  "type": "object",
+  "required": ["terms", "saved"],
+  "additionalProperties": false,
+  "properties": {
+    "terms": { "type": "array", "maxItems": 30, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 30 } },
+    "saved": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "url", "source", "category", "saved_at"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "pattern": "^https?://" },
+          "source": { "type": "string" },
+          "category": { "type": "string" },
+          "saved_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}" }
+        }
+      }
+    }
+  }
+}

@@ -31,7 +31,7 @@ test("repo is detected from the Pages URL (root or /docs)", () => {
 });
 
 test("committed data passes the schemas in the browser validator", () => {
-  for (const n of ["config", "notifiers", "feed", "seen", "runs"]) {
+  for (const n of ["config", "notifiers", "feed", "seen", "runs", "interests", "links"]) {
     assert.deepEqual([...call("validate", json(`schemas/${n}.schema.json`), json(`data/${n}.json`))], [], n);
   }
 });
@@ -187,4 +187,153 @@ test("cadence text comes from config.schedule.times", () => {
   assert.equal(call("cadenceText", { schedule: { times: ["09:00", "19:00"] } }), "매일 09:00 · 19:00 KST에 확인");
   assert.equal(call("cadenceText", json("data/config.json")).startsWith("매일 "), true);
   assert.equal(call("cadenceText", {}), "실행 시간 미설정");
+});
+
+// ---- picks, interests and link collections (default view)
+
+const plain = (x) => JSON.parse(JSON.stringify(x));
+const TODAY = "2026-10-17";
+
+test("bracketBrand takes a leading [brand] or (brand) only", () => {
+  assert.equal(call("bracketBrand", "[KB Pay] 10월 적립"), "KB Pay");
+  assert.equal(call("bracketBrand", "  (토스) 행운퀴즈"), "토스");
+  assert.equal(call("bracketBrand", "10월 적립 [KB Pay]"), null);
+  assert.equal(call("bracketBrand", "[]빈 괄호"), null);
+  assert.equal(call("bracketBrand", null), null);
+});
+
+test("deriveTerms extracts the [brand] and category keywords in the title, max 3, no duplicates", () => {
+  assert.deepEqual(plain(call("deriveTerms", { title: "[네이버페이] 포인트 적립 이벤트" }, ["포인트", "적립", "캐시백"])),
+    ["네이버페이", "포인트", "적립"]);
+  assert.deepEqual(plain(call("deriveTerms", { title: "Naver 포인트" }, ["naver", "NAVER", "쿠폰"])), ["naver", "NAVER"],
+    "keyword match is case-insensitive; distinct spellings are kept");
+  assert.deepEqual(plain(call("deriveTerms", { title: "[A] a b c d" }, ["a", "b", "c", "d"])).length, 3);
+  assert.deepEqual(plain(call("deriveTerms", { title: "[적립] 적립왕" }, ["적립"])), ["적립"], "brand == keyword is deduped");
+  assert.deepEqual(plain(call("deriveTerms", { title: "그냥 딜" })), []);
+});
+
+test("interestScore counts matching terms over title, summary and source name", () => {
+  const it = deal({ title: "네이버페이 적립", summary: "KB 카드 결제", source: "rss:ppomppu_coupon" });
+  assert.equal(call("interestScore", it, ["네이버", "kb", "뽐뿌", "카카오"]), 3);
+  assert.equal(call("interestScore", it, []), 0);
+  assert.equal(call("interestScore", deal({ summary: null }), ["null"]), 0);
+});
+
+test("valueScore prefers free, big discounts, closing soon and new", () => {
+  const base = deal({ summary: null, status: "seen" });
+  assert.equal(call("valueScore", base, TODAY), 0);
+  assert.ok(call("valueScore", deal({ price_krw: 0 }), TODAY) > call("valueScore", deal(), TODAY));
+  assert.ok(call("valueScore", deal({ discount_pct: 50 }), TODAY) > call("valueScore", deal({ discount_pct: 10 }), TODAY));
+  assert.ok(call("valueScore", deal({ ends: "2026-10-20" }), TODAY) > call("valueScore", deal({ ends: "2026-11-30" }), TODAY));
+  assert.ok(call("valueScore", deal({ status: "new" }), TODAY) > call("valueScore", deal(), TODAY));
+});
+
+test("pickDeals with no terms is generic, best value first, capped at n", () => {
+  const pool = [deal({ id: "a" }), deal({ id: "b", price_krw: 0 }), deal({ id: "c", discount_pct: 40 }), deal({ id: "d" })];
+  const r = plain(call("pickDeals", pool, { terms: [], saved: [] }, 2, TODAY));
+  assert.equal(r.mode, "generic");
+  assert.deepEqual(r.items.map((i) => i.id), ["b", "c"]);
+  assert.equal(plain(call("pickDeals", pool, null, 4, TODAY)).mode, "generic", "missing interests file");
+});
+
+test("pickDeals with matching terms is interest mode, more matches first", () => {
+  const pool = [
+    deal({ id: "free", price_krw: 0, title: "무료 쿠폰" }),
+    deal({ id: "one", title: "네이버페이 적립" }),
+    deal({ id: "two", title: "네이버페이 KB 적립" }),
+  ];
+  const r = plain(call("pickDeals", pool, { terms: ["네이버", "KB"] }, 4, TODAY));
+  assert.equal(r.mode, "interest");
+  assert.deepEqual(r.items.map((i) => i.id), ["two", "one"], "non-matching deals are not mixed in");
+});
+
+test("pickDeals falls back to generic when no deal matches the terms", () => {
+  const pool = [deal({ id: "a" }), deal({ id: "b", price_krw: 0 })];
+  const r = plain(call("pickDeals", pool, { terms: ["카카오"] }, 4, TODAY));
+  assert.equal(r.mode, "generic");
+  assert.deepEqual(r.items.map((i) => i.id), ["b", "a"]);
+});
+
+test("pickDeals excludes ignored and expired deals and dedupes by id (page item wins)", () => {
+  const pool = [
+    deal({ id: "x", status: "bought", title: "페이지 쪽" }),
+    deal({ id: "ign", status: "ignored", price_krw: 0 }),
+    deal({ id: "old", ends: "2026-10-16", price_krw: 0 }),
+    deal({ id: "today", ends: TODAY }),
+    deal({ id: "x", status: "new", title: "recent 쪽" }),
+  ];
+  const r = plain(call("pickDeals", pool, { terms: [] }, 10, TODAY));
+  assert.deepEqual(r.items.map((i) => i.id).sort(), ["today", "x"]);
+  assert.equal(r.items.find((i) => i.id === "x").title, "페이지 쪽");
+  assert.deepEqual(plain(call("pickDeals", [], { terms: ["a"] }, 4, TODAY)), { mode: "generic", items: [] });
+});
+
+const groups = () => [
+  { id: "points", name: "포인트 모음", tags: ["포인트", "페이"], links: [{ title: "뽐뿌", url: "https://a.com", note: "" }] },
+  { id: "cards", name: "카드사 이벤트", tags: ["카드"], links: [{ title: "카드고릴라", url: "https://b.com", note: "캐시백 비교" }] },
+  { id: "hot", name: "핫딜", tags: ["핫딜"], links: [{ title: "루리웹", url: "https://c.com", note: "게임" }] },
+];
+
+test("rankLinks keeps the file order without interests", () => {
+  const r = plain(call("rankLinks", groups(), []));
+  assert.deepEqual(r.map((g) => g.id), ["points", "cards", "hot"]);
+  assert.deepEqual(r.map((g) => g.match), [0, 0, 0]);
+  assert.deepEqual(plain(call("rankLinks", groups())).map((g) => g.id), ["points", "cards", "hot"]);
+});
+
+test("rankLinks puts groups matching interests first, by match count, stable otherwise", () => {
+  const r = plain(call("rankLinks", groups(), ["게임", "캐시백", "KB카드"]));
+  // cards: 캐시백 (note) + KB카드 (contains tag 카드) = 2; hot: 게임 = 1; points: 0
+  assert.deepEqual(r.map((g) => [g.id, g.match]), [["cards", 2], ["hot", 1], ["points", 0]]);
+  const r2 = plain(call("rankLinks", groups(), ["네이버페이"]));
+  assert.equal(r2[0].id, "points", "term containing a tag (네이버페이 ⊃ 페이) matches");
+  assert.equal(r2[0].match, 1);
+});
+
+test("rankLinks: an empty link note does not make every term match", () => {
+  const r = plain(call("rankLinks", groups(), ["전혀없는말"]));
+  assert.deepEqual(r.map((g) => g.match), [0, 0, 0]);
+});
+
+test("committed links.json ranks and renders", () => {
+  const r = call("rankLinks", json("data/links.json").groups, ["카드"]);
+  assert.ok(r[0].match > 0);
+  const html = call("linksHtml", r);
+  assert.match(html, /badge-new">관심</);
+  assert.doesNotMatch(html, /undefined|null/);
+});
+
+test("linksHtml marks matching groups and escapes names, titles, notes and URLs", () => {
+  const html = call("linksHtml", [
+    { name: "<b>모음</b>", match: 1, links: [{ title: "<img src=x onerror=alert(1)>", url: 'https://e.com/"><script>x</script>', note: "<i>n</i>" }] },
+    { name: "다른", match: 0, links: [{ title: "t", url: "https://e.com", note: "" }] },
+  ]);
+  assert.doesNotMatch(html, /<b>모음|<img|<script|<i>n/);
+  assert.match(html, /&lt;b&gt;모음&lt;\/b&gt;/);
+  assert.match(html, /href="https:\/\/e.com\/&quot;&gt;&lt;script&gt;/);
+  assert.match(html, /rel="noopener noreferrer"/);
+  assert.equal((html.match(/link-group match/g) || []).length, 1);
+  assert.equal((html.match(/badge-new">관심/g) || []).length, 1);
+  assert.equal((html.match(/<span>/g) || []).length, 1, "empty note renders no span");
+});
+
+test("deal card: ☆/★ 관심 button and opts.marks=false hides 샀음/무시", () => {
+  const plainCard = call("dealCardHtml", deal(), "포인트", TODAY);
+  assert.match(plainCard, /data-act="interest" class="star" aria-pressed="false">☆ 관심</);
+  assert.match(plainCard, /data-act="bought"/);
+  assert.match(plainCard, /data-act="ignored"/);
+  const saved = call("dealCardHtml", deal({ status: "bought" }), "포인트", TODAY, { saved: true });
+  assert.match(saved, /class="star on" aria-pressed="true">★ 관심</);
+  assert.match(saved, /data-act="bought" class="on"/);
+  const pick = call("dealCardHtml", deal(), "포인트", TODAY, { saved: false, marks: false });
+  assert.match(pick, /☆ 관심/);
+  assert.doesNotMatch(pick, /data-act="bought"|data-act="ignored"/);
+  const undef = call("dealCardHtml", deal(), "포인트", TODAY, { marks: undefined });
+  assert.match(undef, /data-act="bought"/, "only an explicit false hides the marks");
+});
+
+test("deal card in picks mode still escapes everything", () => {
+  const html = call("dealCardHtml", deal({ id: "\"><script>1</script>", title: "<svg onload=x>", summary: "<script>y</script>" }),
+    "<i>c</i>", TODAY, { saved: true, marks: false });
+  assert.doesNotMatch(html, /<svg|<script|<i>c/);
 });

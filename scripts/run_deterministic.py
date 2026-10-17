@@ -24,6 +24,7 @@ import filters
 from sources import enabled_sources, fetch_source
 
 BOUGHT_LIMIT = 200
+RECENT_LIMIT = 60  # pool for the page's 대표/관심 딜 picks, so a quiet run still has something to show
 PENDING_DAYS = 22  # longest notify window (weekly: up to 21 days back) + 1
 FEEDBACK_LIMIT = 20
 SAMPLE_LIMIT = 10
@@ -64,7 +65,7 @@ def collect(config: dict, since) -> tuple[list[dict], list[dict]]:
 
 
 def empty_feed() -> dict:
-    return {"run_at": None, "items": [], "pending": [], "bought": []}
+    return {"run_at": None, "items": [], "pending": [], "bought": [], "recent": []}
 
 
 def load_feed() -> dict:
@@ -78,6 +79,7 @@ def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int) -> dict
     - items:   replaced by this run's new deals
     - pending: notification queue, so daily/weekly digests survive the replacement
     - bought:  deals marked 샀음 on the page are kept for the monthly stats
+    - recent:  rolling pool of still-open deals from recent runs (대표/관심 딜 picks)
     """
     feedback = {s: [{"title": it["title"][:80], "source": it["source"], "url": it["url"]}
                     for it in feed["items"] if it.get("status") == s][:FEEDBACK_LIMIT]
@@ -97,6 +99,16 @@ def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int) -> dict
     kept = [p for p in feed["pending"]
             if (common.parse_dt(p.get("found_at")) or run_at) >= cutoff]
     feed["pending"] = [copy.deepcopy(it) for it in added] + kept
+    today = run_at.date().isoformat()
+    pool, ids = [], set()
+    for it in [copy.deepcopy(a) for a in added] + feed["recent"]:
+        status = marks.get(it["id"], it.get("status", "new"))  # the page's mark wins
+        ignored = "ignored" in (status, it.get("status"))  # ignored on the page or earlier in the pool
+        if it["id"] in ids or (it.get("ends") and it["ends"] < today) or ignored:
+            continue
+        ids.add(it["id"])
+        pool.append({**it, "status": status})
+    feed["recent"] = pool[:RECENT_LIMIT]
     return feedback
 
 

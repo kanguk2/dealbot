@@ -66,11 +66,19 @@ class FeedReplaceTest(DataDirTest):
     def test_old_feed_format_is_migrated(self):
         self.write("feed", {"items": []})
         self.collect([item(1)], DAY1)
-        self.assertEqual(set(self.read("feed")), {"run_at", "items", "pending", "bought"})
+        self.assertEqual(set(self.read("feed")), {"run_at", "items", "pending", "bought", "recent"})
 
 
 class NotifyScheduleTest(DataDirTest):
-    """Default config: points is 'daily', ntfy takes instant+daily."""
+    """Pinned here (not the committed default): points is 'daily', runs at 09:00 and 19:00; ntfy takes instant+daily."""
+
+    def setUp(self):
+        super().setUp()
+
+        def pin(c):
+            c["categories"][0]["priority"] = "daily"
+            c["schedule"]["times"] = ["09:00", "19:00"]
+        self.edit("config", pin)
 
     def notify(self, now, *extra, env=NTFY):
         return self.run_script("notify.py", "--since-run", *extra, now=now, env=env).stdout

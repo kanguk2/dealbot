@@ -11,7 +11,7 @@ import sys
 
 import common
 
-FILES = ("config", "notifiers", "feed", "seen", "runs")
+FILES = ("config", "notifiers", "feed", "seen", "runs", "interests", "links")
 
 # Credential-shaped values are never allowed anywhere in data/.
 SECRET_VALUE = re.compile(
@@ -91,7 +91,7 @@ def validate() -> list[str]:
             problems.append(f"{name}: invalid JSON: {e}")
             continue
         if data[name] is None:
-            problems.append(f"{name}: missing file {path.relative_to(common.ROOT)}")
+            problems.append(f"{name}: missing file data/{path.name}")
             continue
         problems += schema_problems(name, data[name])
         problems += secret_problems(name, data[name])

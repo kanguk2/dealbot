@@ -1,0 +1,98 @@
+{
+  "groups": [
+    {
+      "id": "points",
+      "name": "포인트·쿠폰 모음",
+      "tags": [
+        "포인트",
+        "적립",
+        "캐시백",
+        "출석",
+        "퀴즈",
+        "쿠폰",
+        "페이"
+      ],
+      "links": [
+        {
+          "title": "뽐뿌 쿠폰게시판",
+          "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=coupon",
+          "note": "페이·은행 퀴즈, 출석, 적립 이벤트"
+        },
+        {
+          "title": "OK캐쉬백",
+          "url": "https://www.okcashbag.com/",
+          "note": "OK캐쉬백 적립 이벤트"
+        }
+      ]
+    },
+    {
+      "id": "cards",
+      "name": "카드사 이벤트",
+      "tags": [
+        "카드",
+        "캐시백",
+        "결제",
+        "청구할인"
+      ],
+      "links": [
+        {
+          "title": "카드고릴라 이벤트 모음",
+          "url": "https://www.card-gorilla.com/event",
+          "note": "카드사 캐시백 이벤트 비교"
+        },
+        {
+          "title": "삼성카드 진행중 이벤트",
+          "url": "https://www.samsungcard.com/personal/event/ing/UHPPBE1401M0.jsp",
+          "note": "삼성카드 공식"
+        },
+        {
+          "title": "KB국민카드 진행중 이벤트",
+          "url": "https://card.kbcard.com/BON/DVIEW/HBBMCXCRVNEC0001",
+          "note": "KB국민카드 공식"
+        }
+      ]
+    },
+    {
+      "id": "hotdeal",
+      "name": "핫딜 커뮤니티",
+      "tags": [
+        "핫딜",
+        "특가",
+        "할인",
+        "무료"
+      ],
+      "links": [
+        {
+          "title": "뽐뿌게시판",
+          "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=ppomppu",
+          "note": "가장 큰 핫딜 게시판"
+        },
+        {
+          "title": "알구몬",
+          "url": "https://www.algumon.com/",
+          "note": "여러 커뮤니티 핫딜 모아보기"
+        },
+        {
+          "title": "루리웹 핫딜",
+          "url": "https://bbs.ruliweb.com/market/board/1020",
+          "note": "게임·전자제품 위주"
+        },
+        {
+          "title": "에펨코리아 핫딜",
+          "url": "https://www.fmkorea.com/hotdeal",
+          "note": ""
+        },
+        {
+          "title": "클리앙 알뜰구매",
+          "url": "https://www.clien.net/service/board/jirum",
+          "note": ""
+        },
+        {
+          "title": "퀘이사존 핫딜",
+          "url": "https://quasarzone.com/bbs/qb_saleinfo",
+          "note": "PC 부품·전자제품"
+        }
+      ]
+    }
+  ]
+}

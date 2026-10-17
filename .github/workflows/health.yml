@@ -1,0 +1,60 @@
+# Weekly check that dealbot actually ran: alert when the last run is older than 36 hours.
+name: health
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"   # Monday 10:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Alert if the last run is older than 36 hours
+        env:
+          DEALBOT_SLACK_WEBHOOK: ${{ secrets.DEALBOT_SLACK_WEBHOOK }}
+          DEALBOT_DISCORD_WEBHOOK: ${{ secrets.DEALBOT_DISCORD_WEBHOOK }}
+          DEALBOT_TELEGRAM_TOKEN: ${{ secrets.DEALBOT_TELEGRAM_TOKEN }}
+          DEALBOT_TELEGRAM_CHAT_ID: ${{ secrets.DEALBOT_TELEGRAM_CHAT_ID }}
+          DEALBOT_NTFY_TOPIC: ${{ secrets.DEALBOT_NTFY_TOPIC }}
+          DEALBOT_NTFY_TOKEN: ${{ secrets.DEALBOT_NTFY_TOKEN }}
+          DEALBOT_NTFY_SERVER: ${{ secrets.DEALBOT_NTFY_SERVER }}
+          DEALBOT_PUSHOVER_TOKEN: ${{ secrets.DEALBOT_PUSHOVER_TOKEN }}
+          DEALBOT_PUSHOVER_USER: ${{ secrets.DEALBOT_PUSHOVER_USER }}
+          DEALBOT_KAKAO_REST_KEY: ${{ secrets.DEALBOT_KAKAO_REST_KEY }}
+          DEALBOT_KAKAO_REFRESH_TOKEN: ${{ secrets.DEALBOT_KAKAO_REFRESH_TOKEN }}
+          DEALBOT_KAKAO_CLIENT_SECRET: ${{ secrets.DEALBOT_KAKAO_CLIENT_SECRET }}
+          DEALBOT_SMTP_HOST: ${{ secrets.DEALBOT_SMTP_HOST }}
+          DEALBOT_SMTP_USER: ${{ secrets.DEALBOT_SMTP_USER }}
+          DEALBOT_SMTP_PASS: ${{ secrets.DEALBOT_SMTP_PASS }}
+          DEALBOT_SMTP_PORT: ${{ secrets.DEALBOT_SMTP_PORT }}
+          DEALBOT_EMAIL_TO: ${{ secrets.DEALBOT_EMAIL_TO }}
+        run: |
+          stale=$(python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          runs = json.load(open("data/runs.json"))["runs"]
+          if not runs:
+              print("yes")
+          else:
+              last = datetime.fromisoformat(runs[0]["at"])
+              print("yes" if (datetime.now(timezone.utc) - last).total_seconds() > 36 * 3600 else "no")
+          PY
+          )
+          if [ "$stale" = "yes" ]; then
+            python scripts/notify.py --health-alert
+            echo "실행 멈춤 알림을 보냈습니다" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "정상" >> "$GITHUB_STEP_SUMMARY"
+          fi

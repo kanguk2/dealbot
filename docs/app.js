@@ -277,8 +277,11 @@ function daysLeft(ends, today = todayIso()) {
   return Math.round((Date.parse(ends + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000);
 }
 
-/** One deal card (HTML string). Everything user-controlled goes through esc(). */
-function dealCardHtml(it, catName, today = todayIso()) {
+/**
+ * One deal card (HTML string). Everything user-controlled goes through esc().
+ * opts.saved: ☆/★ 관심 state; opts.marks === false hides 샀음/무시 (deals no longer on this run's page).
+ */
+function dealCardHtml(it, catName, today = todayIso(), opts = {}) {
   const s = sourceInfo(it.source);
   const p = it.price_krw, o = it.original_price_krw, pct = it.discount_pct;
   let price;
@@ -302,8 +305,9 @@ function dealCardHtml(it, catName, today = todayIso()) {
     ${it.summary ? `<p class="deal-summary">${esc(it.summary)}</p>` : ""}
     <div class="deal-foot">${due}
       <div class="deal-actions">
-        <button data-act="bought" class="${it.status === "bought" ? "on" : ""}">샀음</button>
-        <button data-act="ignored" class="${it.status === "ignored" ? "on" : ""}">무시</button>
+        <button data-act="interest" class="star${opts.saved ? " on" : ""}" aria-pressed="${!!opts.saved}">${opts.saved ? "★" : "☆"} 관심</button>
+        ${opts.marks === false ? "" : `<button data-act="bought" class="${it.status === "bought" ? "on" : ""}">샀음</button>
+        <button data-act="ignored" class="${it.status === "ignored" ? "on" : ""}">무시</button>`}
       </div>
     </div>
   </article>`;
@@ -336,29 +340,107 @@ function runChartSvg(runs, count = 14) {
     <div class="trend-legend"><span><i style="background:var(--brand)"></i>새 딜 수</span><span><i style="background:#f0a020"></i>오류가 있었던 실행</span><span>최근 ${list.length}회 · 합계 ${total}건</span></div>`;
 }
 
-/** "09:00 · 19:00 KST 확인" from config.schedule. */
+/** "매일 09:00 KST에 확인" from config.schedule. */
 function cadenceText(config) {
   const times = (config && config.schedule && config.schedule.times) || [];
   return times.length ? `매일 ${times.join(" · ")} KST에 확인` : "실행 시간 미설정";
 }
 
+// ------------------------------------------------------------------ picks & interests
+// Default view (no search/filter): a few representative deals plus curated link collections.
+// ☆ 관심 on a card saves it to data/interests.json and derives interest terms from it; from then
+// on the picks and the links favour those terms (and Codex searches for them first).
+
+const PICK_COUNT = 4;
+const emptyInterests = () => ({ terms: [], saved: [] });
+
+/** "[KB Pay] 10월 적립" -> "KB Pay" */
+function bracketBrand(title) {
+  const m = (title || "").match(/^\s*[\[(]([^\])]{1,20})[\])]/);
+  return m ? m[1].trim() : null;
+}
+
+/** Terms learned from a starred deal: its [brand] plus category keywords found in the title. */
+function deriveTerms(item, keywords = []) {
+  const title = (item.title || "").toLowerCase();
+  const out = [];
+  const brand = bracketBrand(item.title);
+  if (brand) out.push(brand);
+  for (const k of keywords) if (k && title.includes(k.toLowerCase())) out.push(k);
+  return [...new Set(out)].slice(0, 3);
+}
+
+function interestScore(it, terms) {
+  const hay = `${it.title} ${it.summary || ""} ${sourceInfo(it.source).name}`.toLowerCase();
+  return terms.reduce((s, t) => s + (t && hay.includes(t.toLowerCase()) ? 1 : 0), 0);
+}
+
+/** Generic "how good is this deal" score for the default picks. */
+function valueScore(it, today = todayIso()) {
+  let s = 0;
+  if (it.price_krw === 0) s += 2;
+  if (it.discount_pct) s += it.discount_pct / 25;
+  if (it.ends && daysLeft(it.ends, today) <= 7) s += 1;
+  if (it.summary) s += 0.3;
+  if (it.status === "new") s += 0.5;
+  return s;
+}
+
+/**
+ * Representative deals. With interest terms: deals matching them, best first ("interest").
+ * Without terms, or when nothing matches: the best deals overall ("generic").
+ */
+function pickDeals(pool, interests, n = PICK_COUNT, today = todayIso()) {
+  const seen = new Set();
+  const open = visibleItems(pool, today).filter((i) => i.status !== "ignored" && !seen.has(i.id) && seen.add(i.id));
+  const terms = (interests && interests.terms) || [];
+  const byValue = (a, b) => valueScore(b, today) - valueScore(a, today);
+  if (terms.length) {
+    const hits = open.map((i) => [i, interestScore(i, terms)]).filter(([, s]) => s > 0)
+      .sort((a, b) => b[1] - a[1] || byValue(a[0], b[0])).map(([i]) => i);
+    if (hits.length) return { mode: "interest", items: hits.slice(0, n) };
+  }
+  return { mode: "generic", items: open.sort(byValue).slice(0, n) };
+}
+
+/** Link groups, those matching interest terms first; each group gets a match count. */
+function rankLinks(groups, terms = []) {
+  const low = terms.map((t) => t.toLowerCase());
+  const score = (g) => low.filter((t) => [...g.tags, g.name, ...g.links.map((l) => `${l.title} ${l.note}`)]
+    .some((x) => x.toLowerCase().includes(t) || t.includes(x.toLowerCase()))).length;
+  return groups.map((g, i) => ({ ...g, match: score(g), order: i }))
+    .sort((a, b) => b.match - a.match || a.order - b.order);
+}
+
+function linksHtml(groups) {
+  return groups.map((g) => `<div class="link-group${g.match ? " match" : ""}">
+    <h4>${esc(g.name)}${g.match ? '<span class="badge-new">관심</span>' : ""}</h4>
+    <div class="link-list">${g.links.map((l) => `<a class="link-card" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
+      <b>${esc(l.title)}</b>${l.note ? `<span>${esc(l.note)}</span>` : ""}<i>↗</i></a>`).join("")}</div>
+  </div>`).join("");
+}
+
 async function initFeed() {
   const ui = { cat: "*", status: "active", q: "", shown: PAGE };
-  let feed = { run_at: null, items: [], pending: [], bought: [] }, cats = {}, runs = null, config = null;
+  let feed = { run_at: null, items: [], pending: [], bought: [], recent: [] }, cats = {}, runs = null, config = null;
+  let interests = emptyInterests(), linkGroups = [];
   const $ = (id) => document.getElementById(id);
   const list = $("list");
 
   async function load() {
-    const [feedRes, runsRes, cfgRes] = await Promise.allSettled([
-      readFile("data/feed.json"), readFile("data/runs.json"), readFile("data/config.json")]);
+    const [feedRes, runsRes, cfgRes, intRes, linkRes] = await Promise.allSettled([
+      readFile("data/feed.json"), readFile("data/runs.json"), readFile("data/config.json"),
+      readFile("data/interests.json"), readFile("data/links.json")]);
     if (feedRes.status === "rejected") throw feedRes.reason;
-    feed = { run_at: null, items: [], pending: [], bought: [], ...feedRes.value.data };
+    feed = { run_at: null, items: [], pending: [], bought: [], recent: [], ...feedRes.value.data };
     runs = runsRes.status === "fulfilled" ? runsRes.value.data : null;
     if (cfgRes.status === "fulfilled") {
       config = cfgRes.value.data;
       cats = {};
       for (const c of config.categories || []) cats[c.id] = c.name;
     }
+    interests = intRes.status === "fulfilled" ? { ...emptyInterests(), ...intRes.value.data } : emptyInterests();
+    linkGroups = linkRes.status === "fulfilled" ? linkRes.value.data.groups || [] : [];
     renderRun(runs, feed, config);
     renderStats(feed, runs);
     fillCategories();
@@ -407,11 +489,45 @@ async function initFeed() {
   $("q").addEventListener("input", (e) => { ui.q = e.target.value; ui.shown = PAGE; draw(); });
   $("more").addEventListener("click", () => { ui.shown += PAGE; draw(); });
 
-  list.addEventListener("click", async (ev) => {
+  const findItem = (id) => feed.items.find((i) => i.id === id) || (feed.recent || []).find((i) => i.id === id);
+  const isSaved = (id) => interests.saved.some((s) => s.id === id);
+
+  async function toggleInterest(item) {
+    const saving = !isSaved(item.id);
+    const cat = ((config && config.categories) || []).find((c) => c.id === item.category);
+    const learned = saving ? deriveTerms(item, cat ? cat.keywords : []) : [];
+    const prev = JSON.parse(JSON.stringify(interests));
+    const apply = (data) => {
+      data.terms = data.terms || []; data.saved = data.saved || [];
+      if (saving) {
+        data.saved = [{ id: item.id, title: item.title, url: item.url, source: item.source, category: item.category, saved_at: todayIso() },
+          ...data.saved.filter((s) => s.id !== item.id)].slice(0, 50);
+        data.terms = [...new Set([...data.terms, ...learned])].slice(0, 30);
+      } else {
+        data.saved = data.saved.filter((s) => s.id !== item.id);
+      }
+      return data;
+    };
+    interests = apply(interests); draw();
+    try {
+      await updateFile("data/interests.json", (data) => apply({ ...emptyInterests(), ...data }),
+        `ui: ${saving ? "save" : "unsave"} interest ${item.id}`);
+      toast(saving
+        ? (learned.length ? `관심에 저장했습니다. 다음부터 '${learned.join(" · ")}' 위주로 보여줍니다` : "관심에 저장했습니다")
+        : "관심에서 뺐습니다 (관심 키워드는 설정에서 지울 수 있습니다)");
+    } catch (e) {
+      interests = prev; draw();
+      toast(`저장 실패: ${e.message}`, "error");
+    }
+  }
+
+  async function onCardClick(ev) {
     const btn = ev.target.closest("button[data-act]");
     if (!btn) return;
     const id = btn.closest("article").dataset.id;
-    const item = feed.items.find((i) => i.id === id);
+    const item = findItem(id);
+    if (!item) return;
+    if (btn.dataset.act === "interest") return toggleInterest(item);
     const next = item.status === btn.dataset.act ? "seen" : btn.dataset.act;
     const prev = item.status;
     item.status = next; draw();
@@ -429,23 +545,50 @@ async function initFeed() {
       item.status = prev; draw();
       toast(`저장 실패: ${e.message}`, "error");
     }
-  });
+  }
+  list.addEventListener("click", onCardClick);
+  $("pick-list").addEventListener("click", onCardClick);
+
+  /** Default view only (no search, no filters): representative or interest-based picks + curated links. */
+  function drawPicks(today) {
+    const isDefault = !ui.q.trim() && ui.cat === "*" && ui.status === "active";
+    $("picks").hidden = !isDefault;
+    if (!isDefault) return;
+    const onPage = new Set(feed.items.map((i) => i.id));
+    const picks = pickDeals([...feed.items, ...(feed.recent || [])], interests, PICK_COUNT, today);
+    const terms = interests.terms;
+    const interestMode = picks.mode === "interest";
+    $("picks-kicker").textContent = interestMode ? "MY PICKS" : "PICKS";
+    $("picks-title").textContent = interestMode ? "관심 딜" : "대표 딜";
+    $("picks-note").innerHTML = interestMode
+      ? `관심: ${terms.map((t) => `<span class="chip">${esc(t)}</span>`).join(" ")} · <a href="settings.html#interests">관심 키워드 고치기</a>`
+      : terms.length
+        ? `관심 키워드(${terms.map(esc).join(" · ")})에 맞는 딜이 아직 없어 최근 딜 중 혜택이 큰 것을 골랐습니다.`
+        : "최근 딜 중 혜택이 큰 것을 골랐습니다. 카드의 <b>☆ 관심</b>을 누르면 다음부터 그쪽 위주로 보여줍니다.";
+    $("pick-list").innerHTML = picks.items.length
+      ? picks.items.map((it) => dealCardHtml(it, cats[it.category] || it.category, today,
+          { saved: isSaved(it.id), marks: onPage.has(it.id) })).join("")
+      : '<p class="muted">아직 보여줄 딜이 없습니다. 아래 모아보기에서 바로 둘러보세요.</p>';
+    $("links").innerHTML = linksHtml(rankLinks(linkGroups, terms));
+  }
 
   function draw() {
     const allowed = STATUS_FILTERS[ui.status];
     const today = todayIso();
+    drawPicks(today);
     const rows = visibleItems(feed.items, today).filter((i) =>
       (ui.cat === "*" || i.category === ui.cat) && allowed.includes(i.status) && matchesQuery(i, ui.q));
     $("result-count").textContent = `THIS RUN / ${String(rows.length).padStart(2, "0")}`;
     if (rows.length) {
-      list.innerHTML = rows.slice(0, ui.shown).map((it) => dealCardHtml(it, cats[it.category] || it.category, today)).join("");
+      list.innerHTML = rows.slice(0, ui.shown).map((it) =>
+        dealCardHtml(it, cats[it.category] || it.category, today, { saved: isSaved(it.id) })).join("");
     } else {
       const filtered = feed.items.length > 0;
       list.innerHTML = `<div class="empty-state">
         <h3>${filtered ? "조건에 맞는 딜이 없습니다." : feed.run_at ? "이번 실행에서 새로 잡힌 딜이 없습니다." : "아직 실행 결과가 없습니다."}</h3>
         <p>${filtered ? "검색어나 분야·상태 필터를 바꿔 보세요."
-          : feed.run_at ? `${esc(fmtDateTime(feed.run_at))} 실행에서 조건에 맞는 새 딜이 없었습니다. 다음 실행 때 자동으로 갱신됩니다. 키워드나 조건을 넓히려면 설정에서 바꾸세요.`
-          : "Codex가 처음 실행되면 이 화면에 결과가 나타납니다. 처음이라면 가이드부터 보세요."}</p>
+          : feed.run_at ? `${esc(fmtDateTime(feed.run_at))} 실행에서 조건에 맞는 새 딜이 없었습니다. 위의 대표 딜과 모아보기를 둘러보거나, 키워드·조건을 넓히려면 설정에서 바꾸세요.`
+          : "Codex가 처음 실행되면 이 화면에 결과가 나타납니다. 그 전에는 위의 모아보기 링크를 둘러보세요."}</p>
         <a class="request-button" href="${filtered || feed.run_at ? "settings.html" : "guide.html"}">${filtered || feed.run_at ? "검색 조건 바꾸기 ↗" : "사용 가이드 보기 ↗"}</a>
       </div>`;
     }
@@ -470,7 +613,7 @@ function renderRun(runs, feed, config) {
   if (!last) {
     label.innerHTML = '<span class="status-dot stale"></span>첫 실행 대기';
     meta.textContent = "";
-    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. Codex Automation 설정을 확인하세요.";
+    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. GitHub Actions의 dealbot 워크플로를 한 번 실행하세요(가이드 참고).";
     banner.hidden = false;
     return;
   }
@@ -479,7 +622,7 @@ function renderRun(runs, feed, config) {
   meta.innerHTML = `${esc(fmtDateTime(feed.run_at || last.at))} 실행 · 찾음 ${last.found} · 새 딜 ${last.new} · 알림 ${last.notified}` +
     (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "");
   if (hours >= 24) {
-    banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. Codex Automation 실행 기록을 확인하세요.`;
+    banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. GitHub Actions의 dealbot 실행 기록을 확인하세요.`;
     banner.hidden = false;
   }
 }
@@ -562,12 +705,15 @@ function setCheck(arr, value, label) {
 
 async function initSettings() {
   const main = document.getElementById("forms");
-  let cfg, nts, schemas, original;
+  let cfg, nts, ints, schemas, original;
+  const snapshot = () => ({ config: JSON.stringify(cfg), notifiers: JSON.stringify(nts), interests: JSON.stringify(ints), times: JSON.stringify(cfg.schedule.times) });
   try {
-    const [c, n, sc, sn] = await Promise.all([readFile("data/config.json"), readFile("data/notifiers.json"),
-      readFile("schemas/config.schema.json"), readFile("schemas/notifiers.schema.json")]);
-    cfg = c.data; nts = n.data; schemas = { config: sc.data, notifiers: sn.data };
-    original = { config: JSON.stringify(cfg), notifiers: JSON.stringify(nts), times: JSON.stringify(cfg.schedule.times) };
+    const [c, n, sc, sn, si] = await Promise.all([readFile("data/config.json"), readFile("data/notifiers.json"),
+      readFile("schemas/config.schema.json"), readFile("schemas/notifiers.schema.json"), readFile("schemas/interests.schema.json")]);
+    const i = await readFile("data/interests.json").catch(() => ({ data: emptyInterests() }));
+    cfg = c.data; nts = n.data; ints = { ...emptyInterests(), ...i.data };
+    schemas = { config: sc.data, notifiers: sn.data, interests: si.data };
+    original = snapshot();
   } catch (e) {
     main.innerHTML = `<p class="empty">설정을 불러오지 못했습니다: ${esc(e.message)}</p>`;
     return;
@@ -619,7 +765,7 @@ async function initSettings() {
     if (!cfg.quiet_hours) cfg.quiet_hours = null;
     const quietOn = !!cfg.quiet_hours;
     return h("div", null,
-      field("실행 시간 (Codex Automation 주기와 맞추세요)", h("div", { class: "times" },
+      field("실행 시간 (dealbot.yml의 cron과 맞추세요)", h("div", { class: "times" },
         times.map((t, i) => h("span", { class: "time" },
           h("input", { type: "time", value: t, onchange: (e) => (times[i] = e.target.value) }),
           h("button", { type: "button", "aria-label": "삭제", onclick: () => { times.splice(i, 1); draw(); } }, "×"))),
@@ -660,8 +806,21 @@ async function initSettings() {
         field("피드 주소 (알림 하단 링크)", h("input", { type: "url", value: f.feed_url || "", oninput: (e) => (f.feed_url = e.target.value.trim()) }))));
   }
 
+  function interestsEditor() {
+    return h("div", null,
+      field("관심 키워드", tagInput(ints.terms, "예: 네이버페이, 캐시백 (Enter)"),
+        "피드 첫 화면의 '관심 딜'과 모아보기가 이 키워드 위주로 바뀝니다. Codex도 다음 검색부터 이 키워드를 먼저 찾습니다. 피드 카드의 ☆ 관심을 누르면 자동으로 추가됩니다."),
+      field(`☆ 관심으로 저장한 딜 (${ints.saved.length})`, ints.saved.length
+        ? h("div", { class: "saved-list" }, ints.saved.map((s, idx) => h("div", { class: "saved-row" },
+            h("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.title),
+            h("small", null, s.saved_at),
+            h("button", { type: "button", class: "danger", "aria-label": "삭제", onclick: () => { ints.saved.splice(idx, 1); draw(); } }, "×"))))
+        : h("p", { class: "hint" }, "아직 없습니다. 피드에서 마음에 드는 딜의 ☆ 관심을 누르세요.")));
+  }
+
   function draw() {
     main.replaceChildren(...[
+      h("h2", { id: "interests" }, "관심사"), h("section", { class: "card" }, interestsEditor()),
       h("h2", null, "카테고리"),
       cfg.categories.map(categoryCard),
       h("button", { type: "button", class: "add", onclick: () => {
@@ -703,7 +862,8 @@ async function initSettings() {
     document.activeElement && document.activeElement.blur(); // flush pending tag input
     cfg.schedule.times = [...new Set(cfg.schedule.times.filter(Boolean))].sort();
     const errors = [...validate(schemas.config, cfg).map((e) => `config ${e}`),
-      ...validate(schemas.notifiers, nts).map((e) => `notifiers ${e}`), ...crossCheck()];
+      ...validate(schemas.notifiers, nts).map((e) => `notifiers ${e}`),
+      ...validate(schemas.interests, ints).map((e) => `관심사 ${e}`), ...crossCheck()];
     if (errors.length) {
       out.className = "result error";
       out.replaceChildren(h("b", null, "저장하지 않았습니다. 고칠 곳:"), h("ul", null, errors.map((e) => h("li", null, e))));
@@ -712,17 +872,19 @@ async function initSettings() {
     const jobs = [];
     if (JSON.stringify(cfg) !== original.config) jobs.push(["data/config.json", cfg, "ui: update config"]);
     if (JSON.stringify(nts) !== original.notifiers) jobs.push(["data/notifiers.json", nts, "ui: update notifiers"]);
+    if (JSON.stringify(ints) !== original.interests) jobs.push(["data/interests.json", ints, "ui: update interests"]);
     if (!jobs.length) { out.className = "result"; out.textContent = "바뀐 내용이 없습니다."; return; }
     btn.disabled = true; out.className = "result"; out.textContent = "저장 중…";
     try {
       // These files belong to the UI (Codex never writes them), so a conflict just retries with the fresh sha.
+      // (snapshot() must run after the jobs: timesChanged below compares against the loaded state.)
       for (const [path, obj, msg] of jobs) await updateFile(path, () => obj, msg);
       const timesChanged = JSON.stringify(cfg.schedule.times) !== original.times;
-      original = { config: JSON.stringify(cfg), notifiers: JSON.stringify(nts), times: JSON.stringify(cfg.schedule.times) };
+      original = snapshot();
       out.className = "result ok";
       out.replaceChildren(h("b", null, "저장했습니다."), timesChanged
-        ? h("p", null, `실행 시간을 ${cfg.schedule.times.join(", ")}(으)로 바꿨습니다. Codex Automation 주기도 같이 바꾸세요.`)
-        : h("p", null, "실행 시간을 바꿨다면 Codex Automation 주기도 바꾸세요."));
+        ? h("p", null, `실행 시간을 ${cfg.schedule.times.join(", ")}(으)로 바꿨습니다. .github/workflows/dealbot.yml의 cron(UTC 기준)도 같이 바꾸세요.`)
+        : h("p", null, "실행 시간을 바꿨다면 dealbot.yml의 cron도 바꾸세요."));
       draw();
     } catch (e) {
       out.className = "result error"; out.textContent = `저장 실패: ${e.message}`;

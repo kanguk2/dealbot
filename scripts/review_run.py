@@ -29,7 +29,7 @@ def finding(kind: str, detail: str, hint: str, evidence=None) -> dict:
     return out
 
 
-def review(config: dict, runs: dict, feed: dict) -> dict:
+def review(config: dict, runs: dict, feed: dict, interests: dict | None = None) -> dict:
     history = runs.get("runs") or []
     if not history:
         return {"run": None, "findings": [finding(
@@ -82,6 +82,17 @@ def review(config: dict, runs: dict, feed: dict) -> dict:
         out.append(finding("search_domains", "이번 검색 결과의 출처 분포",
                            "많이 잡히고 정확한 출처를 ## 우선 출처 위쪽으로 올린다", dict(domains.most_common(8))))
 
+    # --- the user's saved interests (☆ 관심 on the page, 관심 키워드 in settings)
+    terms = [t for t in (interests or {}).get("terms", []) if t]
+    if terms:
+        hits = [i["title"][:60] for i in items if any(t.lower() in f"{i['title']} {i.get('summary') or ''}".lower() for t in terms)]
+        if hits:
+            out.append(finding("interest_hits", f"관심사 {terms}에 맞는 새 딜 {len(hits)}건",
+                               "잘 맞은 검색어·출처를 ## 검색어·## 우선 출처에서 유지하거나 위로 올린다", hits[:5]))
+        else:
+            out.append(finding("interest_miss", f"관심사 {terms}에 맞는 새 딜이 없다",
+                               "## 검색어에 관심사 단어가 들어간 검색어를 하나 추가한다(카테고리 범위 안에서)"))
+
     # --- what the user did on the replaced page
     fb = run.get("user_feedback") or {}
     if fb.get("ignored"):
@@ -115,7 +126,8 @@ def playbook_problems(text: str | None) -> list[str]:
 def main() -> int:
     common.setup_io()
     argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args()
-    report = review(common.load_data("config", {}), common.load_data("runs", {"runs": []}), load_feed())
+    report = review(common.load_data("config", {}), common.load_data("runs", {"runs": []}), load_feed(),
+                    common.load_data("interests", {"terms": [], "saved": []}))
     path = common.DATA / PLAYBOOK
     report["playbook"] = {"chars": len(path.read_text(encoding="utf-8")) if path.exists() else None,
                           "limit": PLAYBOOK_LIMIT}

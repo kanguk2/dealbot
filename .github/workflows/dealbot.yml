@@ -1,0 +1,172 @@
+# DealBot scheduled run (replaces Codex cloud Automation, which cannot push to main unattended).
+#
+#   1. Codex web search (CODEX.md step 2)      -> .tmp/search.json   [only if OPENAI_API_KEY is set]
+#   2. sources + dedupe + filter + record       -> data/             (scripts, deterministic)
+#   3. validate, notify                                              (scripts)
+#   4. Codex review: improve data/playbook.md (CODEX.md step 6)      [only if OPENAI_API_KEY is set]
+#   5. commit data/ and push to main
+#
+# Without OPENAI_API_KEY the run still collects RSS/Epic sources and notifies; web search and
+# playbook learning are skipped. Secrets: Settings -> Secrets and variables -> Actions.
+name: dealbot
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # once a day, 09:00 KST (UTC+9). Keep in sync with config.schedule.times
+  workflow_dispatch:
+    inputs:
+      search:
+        description: "Codex 웹 검색·플레이북 개선 실행 (OPENAI_API_KEY 필요)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dealbot-data
+  cancel-in-progress: false
+
+env:
+  HAS_OPENAI_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
+  USE_CODEX: ${{ secrets.OPENAI_API_KEY != '' && (github.event_name == 'schedule' || inputs.search) }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false   # Codex must not see a push token; we push explicitly at the end
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt && mkdir -p .tmp
+
+      - name: Codex web search (CODEX.md step 2)
+        id: search
+        if: env.USE_CODEX == 'true'
+        continue-on-error: true
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/search.md
+          permission-profile: ":workspace"
+          codex-args: "--search"
+          output-file: .tmp/search-report.txt
+
+      - name: Keep only the search result from Codex
+        if: always()
+        run: |
+          # Codex may only produce .tmp/search.json; anything else it touched is discarded.
+          git checkout -- . 2>/dev/null || true
+          git clean -fdq -e .tmp/
+          if [ -f .tmp/search.json ] && ! python -c "import json,sys; d=json.load(open('.tmp/search.json')); sys.exit(0 if isinstance(d, list) else 1)"; then
+            echo "search.json is not a JSON array; ignoring it"; mv .tmp/search.json .tmp/search.bad.json
+          fi
+
+      - name: Collect, dedupe, filter, record (CODEX.md step 3)
+        env:
+          SEARCH_OUTCOME: ${{ steps.search.outcome }}
+        run: |
+          args=()
+          [ -f .tmp/search.json ] && args+=(--extra .tmp/search.json)
+          if [ "$USE_CODEX" = "true" ] && [ "$SEARCH_OUTCOME" != "success" ]; then
+            args+=(--source-error "search=Codex 검색 단계 실패 (Actions 로그 확인)")
+          fi
+          python scripts/run_deterministic.py "${args[@]}"
+
+      - name: Validate (CODEX.md step 4)
+        id: validate
+        run: python scripts/validate.py --record
+
+      - name: Notify (CODEX.md step 5)
+        if: steps.validate.outcome == 'success'
+        run: python scripts/notify.py --since-run
+        env:
+          DEALBOT_SLACK_WEBHOOK: ${{ secrets.DEALBOT_SLACK_WEBHOOK }}
+          DEALBOT_DISCORD_WEBHOOK: ${{ secrets.DEALBOT_DISCORD_WEBHOOK }}
+          DEALBOT_TELEGRAM_TOKEN: ${{ secrets.DEALBOT_TELEGRAM_TOKEN }}
+          DEALBOT_TELEGRAM_CHAT_ID: ${{ secrets.DEALBOT_TELEGRAM_CHAT_ID }}
+          DEALBOT_NTFY_TOPIC: ${{ secrets.DEALBOT_NTFY_TOPIC }}
+          DEALBOT_NTFY_TOKEN: ${{ secrets.DEALBOT_NTFY_TOKEN }}
+          DEALBOT_NTFY_SERVER: ${{ secrets.DEALBOT_NTFY_SERVER }}
+          DEALBOT_PUSHOVER_TOKEN: ${{ secrets.DEALBOT_PUSHOVER_TOKEN }}
+          DEALBOT_PUSHOVER_USER: ${{ secrets.DEALBOT_PUSHOVER_USER }}
+          DEALBOT_KAKAO_REST_KEY: ${{ secrets.DEALBOT_KAKAO_REST_KEY }}
+          DEALBOT_KAKAO_REFRESH_TOKEN: ${{ secrets.DEALBOT_KAKAO_REFRESH_TOKEN }}
+          DEALBOT_KAKAO_CLIENT_SECRET: ${{ secrets.DEALBOT_KAKAO_CLIENT_SECRET }}
+          DEALBOT_SMTP_HOST: ${{ secrets.DEALBOT_SMTP_HOST }}
+          DEALBOT_SMTP_USER: ${{ secrets.DEALBOT_SMTP_USER }}
+          DEALBOT_SMTP_PASS: ${{ secrets.DEALBOT_SMTP_PASS }}
+          DEALBOT_SMTP_PORT: ${{ secrets.DEALBOT_SMTP_PORT }}
+          DEALBOT_EMAIL_TO: ${{ secrets.DEALBOT_EMAIL_TO }}
+
+      - name: Review the run (CODEX.md step 6)
+        if: steps.validate.outcome == 'success'
+        run: |
+          python scripts/review_run.py > .tmp/review.json
+          # snapshot the script-written data outside the workspace, so Codex cannot alter it
+          mkdir -p "$RUNNER_TEMP/snap" && cp data/*.json "$RUNNER_TEMP/snap/"
+
+      - name: Codex improves the playbook (CODEX.md step 6)
+        id: review
+        if: env.USE_CODEX == 'true' && steps.validate.outcome == 'success'
+        continue-on-error: true
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/review.md
+          permission-profile: ":workspace"
+          output-file: .tmp/review-report.txt
+
+      - name: Keep only playbook edits from Codex
+        if: always()
+        run: |
+          # Only data/playbook.md may change in the review step; restore everything else Codex touched.
+          [ -d "$RUNNER_TEMP/snap" ] || exit 0
+          cp data/playbook.md "$RUNNER_TEMP/playbook.md"
+          git checkout -- . && git clean -fdq -e .tmp/
+          cp "$RUNNER_TEMP"/snap/*.json data/
+          cp "$RUNNER_TEMP/playbook.md" data/playbook.md
+          if ! python scripts/validate.py --quiet; then
+            echo "playbook edit failed validation; reverting it"; git checkout -- data/playbook.md
+          fi
+
+      - name: Commit data/ and push
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.validate.outcome }}" != "success" ]; then
+            git checkout -- data/feed.json data/seen.json data/playbook.md 2>/dev/null || true
+          fi
+          git config user.name "dealbot-actions"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          stamp=$(python -c "import json;print(json.load(open('data/runs.json'))['runs'][0]['at'][:16].replace('T',' '))")
+          new=$(python -c "import json;print(json.load(open('data/runs.json'))['runs'][0]['new'])")
+          prefix=actions; [ "$USE_CODEX" = "true" ] && prefix=codex
+          git commit -q -m "$prefix: run ${stamp} (+${new} new)"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          for i in 1 2 3; do
+            git pull -q --rebase "$remote" main && git push -q "$remote" HEAD:main && exit 0
+            sleep 5
+          done
+          echo "push failed"; exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          r = json.load(open("data/runs.json"))["runs"][0]
+          errs = ", ".join(f"{e['source']}: {e['error']}" for e in r["errors"]) or "없음"
+          print(f"찾은 {r['found']}건, 새 {r['new']}건, 알림 {r['notified']}건, 오류: {errs}")
+          PY
+          for f in .tmp/search-report.txt .tmp/review-report.txt; do [ -f "$f" ] && { echo; echo "### $f"; cat "$f"; } >> "$GITHUB_STEP_SUMMARY"; done; true

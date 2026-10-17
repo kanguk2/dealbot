@@ -2,7 +2,7 @@
 
 내가 정한 분야·키워드의 특가, 포인트 적립, 할인 이벤트를 하루 몇 번 모아서 원하는 채널(ntfy 폰 푸시, Slack, Discord, Telegram, Pushover, 카카오톡, 이메일)로 보내 주는 개인용 봇이다. 서버는 없다.
 
-- **수집·판단·알림 실행**: Codex Automation (클라우드). 매 실행마다 [`CODEX.md`](CODEX.md)를 따른다.
+- **수집·판단·알림 실행**: GitHub Actions(`dealbot.yml`, 하루 1회 09:00 KST)가 [`CODEX.md`](CODEX.md) 순서대로 돌리고, 웹 검색과 검색 요령 학습은 Codex(`openai/codex-action`)가 맡는다.
 - **설정·피드 보기**: GitHub Pages (`docs/`). 폰 브라우저에서 편집한다.
 - **상태**: 이 저장소의 `data/*.json`이 전부다. 되돌리기는 `git revert` 한 번이면 된다.
 
@@ -28,7 +28,8 @@ dealbot/
 │   └── notifiers/       채널 플러그인 (파일 하나 = 채널 하나)
 ├── schemas/         JSON Schema (UI와 validate.py가 같이 씀)
 ├── CODEX.md         Codex 운영 지침
-└── .github/workflows/deterministic.yml   백업 실행기 (기본 꺼짐, 수동 실행만)
+├── .github/workflows/dealbot.yml   정기 실행 (매일 09:00 KST, Codex 검색 포함)
+└── .github/codex/   워크플로가 Codex에게 주는 프롬프트 (검색, 회고)
 ```
 
 ## 로컬에서 돌려 보기
@@ -121,49 +122,42 @@ GitHub **Settings → Developer settings → Fine-grained personal access tokens
 
 refresh_token은 약 2개월 동안 유효하다. 만료되면 `notify.py`가 다른 켜진 채널로 "카카오 토큰 갱신 필요" 알림을 보낸다(하루 1회). 그때 6~7단계를 다시 한다.
 
-### 4. Codex 클라우드 환경
+### 4. 자동 실행 연결 (GitHub Actions + Codex)
 
-1. Codex 웹에서 이 저장소를 **환경**으로 추가한다.
-2. 셋업 스크립트에 `pip install -r requirements.txt`를 넣는다.
-3. 인터넷 접근을 켜고 도메인 허용 목록에 다음을 넣는다.
-   - GitHub: `github.com`, `api.github.com`
-   - 알림: `ntfy.sh`, `hooks.slack.com`, `discord.com`, `api.telegram.org`, `api.pushover.net`, `kapi.kakao.com`, `kauth.kakao.com`
-   - 소스: `www.ppomppu.co.kr`, `bbs.ruliweb.com`, `store-site-backend-static-ipv4.ak.epicgames.com`
-   - 웹 검색을 쓰려면 검색 결과로 열 사이트도 허용해야 한다. 허용 목록이 좁으면 검색은 사실상 막힌다. 처음에는 RSS 위주로 돌리고, 검색은 목록을 넓힌 뒤 켠다.
-4. 시크릿(환경변수)에 3단계 표의 변수를 넣는다.
-5. Codex GitHub 앱이 `main`에 push할 수 있어야 한다. 브랜치 보호를 걸었다면 Codex 봇 계정을 예외로 둔다.
-6. 수동으로 한 번 실행한다(아래 메인 프롬프트). `codex: run ...` 커밋이 생기고 피드 화면에 실행 기록이 뜨는지 확인한다.
+Codex cloud의 예약 작업(Automation)은 저장소 `main`에 무인으로 push하는 흐름을 지원하지 않는다(2026-10 기준). 예약 작업은 PC 데스크톱 앱이나 팀 플랜에서만 돌고, cloud 작업은 사람이 검토한 뒤 커밋하거나 PR을 연다. 그래서 딜봇은 **GitHub Actions 워크플로 `.github/workflows/dealbot.yml`**이 정해진 시간에 실행하고, 판단이 필요한 두 단계만 공식 [`openai/codex-action`](https://github.com/openai/codex-action)으로 Codex에게 맡긴다.
 
-## 자동 실행 (M3)
+| 단계 (CODEX.md) | 누가 | 비고 |
+| --- | --- | --- |
+| 2. 웹 검색 → `.tmp/search.json` | Codex (`--search`) | 프롬프트: `.github/codex/search.md` |
+| 3~5. 수집·중복·필터·검증·알림 | 워크플로 스크립트 | 결정적 |
+| 6. 플레이북 개선 | Codex | 프롬프트: `.github/codex/review.md`. `data/playbook.md` 말고 다른 파일을 고치면 버린다 |
+| 7. `data/` 커밋·push | 워크플로 | `GITHUB_TOKEN`(contents: write) |
 
-Codex Automation을 두 개 등록한다. 환경은 위에서 만든 `dealbot`이다.
+설정 순서 (저장소 소유자 계정으로):
 
-**메인 실행**: 매일 09:00, 19:00 KST. 설정 화면의 "실행 시간"과 맞춘다.
+1. **OpenAI API 키 발급**: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)에서 만든다. 결제 수단을 등록하고, 월 사용 한도(Usage limits)를 정해 두는 것을 권장한다. 실행 1회가 Codex 호출 2번(검색, 회고)이고, API 사용량만큼 과금된다.
+2. 저장소 **Settings → Secrets and variables → Actions → New repository secret**에 넣는다.
+   - `OPENAI_API_KEY`: 1번 키. **없어도 워크플로는 돈다.** 키가 없으면 RSS·에픽 같은 결정적 소스만 수집하고, 웹 검색과 플레이북 학습은 건너뛴다.
+   - `DEALBOT_NTFY_TOPIC` 등 알림 시크릿: 3단계 표 참고
+3. **Settings → Actions → General → Workflow permissions**가 "Read and write permissions"인지 확인한다(기본값이 read only인 경우가 있다). 워크플로 파일에 `permissions: contents: write`가 있어서 보통은 그대로 동작한다.
+4. **Actions 탭 → dealbot → Run workflow**로 한 번 수동 실행한다. 끝나면 `codex: run …`(키가 없으면 `actions: run …`) 커밋이 생기고, 피드 화면에 결과와 실행 기록이 뜬다. 실행 요약(Summary)에 "찾은 N건, 새 M건, 알림 K건, 오류"와 Codex의 한 줄 보고가 나온다.
+5. 이후에는 매일 09:00 KST에 자동으로 돈다(사용자 요청으로 하루 1회). 시간을 바꾸려면 `dealbot.yml`의 `cron`(UTC 기준)과 설정 화면의 "실행 시간"을 같이 바꾼다.
+
+참고:
+- GitHub의 예약 실행은 몇 분에서 수십 분 늦을 수 있다. 저장소에 60일 동안 활동이 없으면 예약이 꺼지지만, 이 봇은 매 실행 커밋하므로 꺼지지 않는다.
+- 워크플로가 실패하면 GitHub가 저장소 소유자에게 메일을 보낸다. 피드 화면도 24시간 이상 실행이 없으면 배너를 띄운다.
+- Codex 검색 단계는 `permission-profile: ":workspace"`로 저장소 폴더 안에서만 파일을 쓸 수 있고, push 권한은 받지 못한다(`persist-credentials: false`).
+
+#### Codex를 사람이 직접 돌리고 싶을 때
+
+ChatGPT의 Codex(클라우드 또는 데스크톱 앱)에서 이 저장소를 열고 아래 프롬프트를 주면 CODEX.md 전체 순서(1~7단계)를 한 번 수행한다. 결과는 Codex 화면에서 검토하고 커밋하거나 PR로 반영한다.
 
 ```
 이 저장소는 개인용 딜 알림 봇이다. 저장소 루트의 CODEX.md를 읽고, 거기 적힌 실행 순서(1~7단계)를 한 번 수행한다.
-
-규칙:
-- 판단이 필요한 건 2단계 웹 검색과 6단계 플레이북 개선뿐이다. 나머지는 CODEX.md에 적힌 스크립트를 그대로 실행한다.
-- data/playbook.md를 읽고 따르며, 6단계에서 근거가 있을 때만 고친다.
-- 값을 모르면 null. 절대 지어내지 않는다.
-- docs/, scripts/, schemas/, CODEX.md는 수정하지 않는다. data/ 아래 변경만 커밋·푸시한다.
-- 이미 끝났거나 마감이 config의 min_days_left일 이내인 이벤트는 고르지 않는다.
-- 로그인·캡차·차단 우회를 시도하지 않는다. 403/429는 그 소스를 이번 실행에서 포기한다.
-- 새 항목이 0건이면 정상이다. runs.json만 갱신하고 커밋한다.
-- 끝나면 한 줄로 보고한다: 찾은 N건, 새 M건, 알림 K건, 오류 목록.
+규칙: 판단이 필요한 건 2단계 웹 검색과 6단계 플레이북 개선뿐이다. 값을 모르면 null, 지어내지 않는다.
+docs/, scripts/, schemas/, CODEX.md는 수정하지 않는다. 이미 끝났거나 마감이 min_days_left일 이내인 이벤트는 고르지 않는다.
+끝나면 한 줄로 보고한다: 찾은 N건, 새 M건, 알림 K건, 오류 목록.
 ```
-
-**health 체크**: 매주 월요일 10:00 KST.
-
-```
-data/runs.json의 runs[0].at을 확인한다. 36시간 이내면 아무것도 하지 않고 "정상"이라고만 보고한다.
-36시간을 넘겼으면 python scripts/notify.py --health-alert 를 실행해 "딜봇이 N시간째 실행되지 않음" 알림을 보내고, 가능한 원인(최근 runs.json errors)을 한 줄로 보고한다. 파일은 수정하지 않는다.
-```
-
-실행 1회가 Codex 세션 1회다. 하루 2~4회가 현실적이다.
-
-**백업 실행기**: Codex 사용량이 부족하거나 클라우드에서 국내 사이트가 막히면, Actions 탭의 `deterministic-run`을 수동으로 돌리거나 워크플로 파일의 `schedule`을 켠다. RSS와 에픽 같은 결정적 소스만 돈다. 시크릿은 저장소 **Settings → Secrets and variables → Actions**에 같은 이름으로 넣는다.
 
 ## 알림 규칙
 

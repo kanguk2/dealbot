@@ -38,7 +38,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
    - 알림을 받았을 때 / 피드 화면 보는 법 / 샀음·무시 표시
 ## 설정 바꾸기
    - 관심 분야(카테고리) 추가·수정 / 키워드·제외어 / 할인율·가격 조건
-   - 알림 시간·조용한 시간 바꾸기 (Codex Automation도 같이)
+   - 알림 시간·조용한 시간 바꾸기 (dealbot.yml cron도 같이)
    - 알림 채널 켜고 끄기, 새 채널 추가
    - RSS 피드 추가
 ## 알림 규칙 이해하기    (instant/daily/weekly가 언제 오는지 예시 시각으로)

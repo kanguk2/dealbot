@@ -2,8 +2,7 @@
   "version": 1,
   "schedule": {
     "times": [
-      "09:00",
-      "19:00"
+      "09:00"
     ],
     "timezone": "Asia/Seoul"
   },
@@ -26,7 +25,7 @@
       ],
       "min_discount_pct": null,
       "max_price_krw": null,
-      "priority": "daily"
+      "priority": "instant"
     }
   ],
   "rss_feeds": {
