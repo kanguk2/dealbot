@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "feed.schema.json",
+  "title": "DealBot feed",
+  "type": "object",
+  "required": ["items"],
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "key", "category", "title", "url", "source", "price_krw", "original_price_krw", "discount_pct", "starts", "ends", "found_at", "summary", "notified", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "key": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "pattern": "^https?://" },
+          "source": { "type": "string", "minLength": 1 },
+          "price_krw": { "type": ["integer", "null"], "minimum": 0 },
+          "original_price_krw": { "type": ["integer", "null"], "minimum": 0 },
+          "discount_pct": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+          "starts": { "$ref": "#/$defs/date_or_null" },
+          "ends": { "$ref": "#/$defs/date_or_null" },
+          "found_at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}" },
+          "summary": { "type": ["string", "null"] },
+          "notified": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+          "status": { "enum": ["new", "seen", "bought", "ignored"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "date_or_null": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+  }
+}
