@@ -4,33 +4,67 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>딜봇 피드</title>
+  <meta name="theme-color" content="#f5f8fc">
+  <title>DealBot · 혜택 레이더</title>
   <link rel="stylesheet" href="style.css">
   <script src="app.js" defer></script>
 </head>
 <body data-page="feed">
-  <header>
-    <h1>딜봇</h1>
-    <nav><a href="./" aria-current="page">피드</a><a href="settings.html">설정</a><a href="guide.html">가이드</a></nav>
+<div class="page-shell">
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="DealBot 홈"><span class="brand-mark">₩</span> DealBot</a>
+    <nav class="site-nav"><a href="./" aria-current="page">피드</a><a href="settings.html">설정</a><a href="guide.html">가이드</a></nav>
   </header>
+
   <main>
-    <div id="banner" class="banner" hidden></div>
-    <p id="run" class="muted">불러오는 중…</p>
-    <p id="stats" class="muted"></p>
-    <div class="toolbar">
-      <div id="cats" class="tabs"></div>
-      <div class="row">
-        <select id="status" aria-label="상태">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">MY DEAL RADAR</p>
+      <h1 id="hero-title">놓치기 싫은 혜택을<br><em>한눈에 모아서.</em></h1>
+      <p class="hero-copy">포인트·적립·할인 이벤트를 정해진 시간마다 찾아, 이번에 새로 잡힌 것만 보여줍니다. 마감이 지났거나 곧 끝나는 건 자동으로 빠집니다.</p>
+      <div class="hero-stats" id="stats" aria-label="이번 달 통계"></div>
+    </section>
+
+    <div id="banner" class="banner" role="status" hidden></div>
+
+    <section class="panel search-panel" aria-labelledby="search-title">
+      <div class="section-top">
+        <div><p class="section-kicker">FIND A DEAL</p><h2 id="search-title">딜 찾기</h2></div>
+        <div class="refresh-actions">
+          <span class="refresh-label" id="refresh-label"><span class="status-dot"></span>불러오는 중</span>
+          <button id="refresh" class="refresh-button" type="button">↻ 게시 데이터 새로고침</button>
+        </div>
+      </div>
+      <form id="filter-form" class="filter-form" role="search" onsubmit="return false">
+        <label class="grow">검색어 <input id="q" type="search" placeholder="예: 캐시백, 네이버페이" autocomplete="off"></label>
+        <label>분야 <select id="cat"><option value="*">전체</option></select></label>
+        <label>상태 <select id="status">
           <option value="active">새 딜·본 것</option>
           <option value="bought">샀음</option>
           <option value="ignored">무시</option>
           <option value="all">전체</option>
-        </select>
-        <span id="count" class="muted"></span>
+        </select></label>
+      </form>
+      <p class="form-hint" id="cadence">새로고침은 게시된 결과만 다시 읽습니다. 사이트를 즉시 검색하지 않습니다.</p>
+    </section>
+
+    <section class="tracker" aria-labelledby="tracker-title">
+      <div class="section-top">
+        <div><p class="section-kicker" id="result-count">THIS RUN</p><h2 id="tracker-title">이번 실행 결과</h2></div>
+        <span class="run-meta" id="run"></span>
       </div>
-    </div>
-    <div id="list"></div>
-    <button id="more" class="more" hidden>더 보기</button>
+      <div id="list" class="results" aria-live="polite"></div>
+      <button id="more" class="text-button more" type="button" hidden>더 보기</button>
+      <p class="data-note">표시된 가격·기한은 수집 시점의 게시글 기준이며 실제와 다를 수 있습니다. 모르는 값은 표시하지 않습니다. 샀음·무시 표시는 다음 검색을 더 정확하게 만드는 데 쓰입니다.</p>
+    </section>
+
+    <section class="panel trend" aria-labelledby="trend-title">
+      <p class="section-kicker">RUN HISTORY</p>
+      <h2 id="trend-title">실행 기록</h2>
+      <div id="trend"></div>
+    </section>
   </main>
+
+  <footer><span>DEALBOT © 2026</span><span id="footer-sources">뽐뿌 · 루리웹 · 웹 검색</span></footer>
+</div>
 </body>
 </html>

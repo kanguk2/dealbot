@@ -82,6 +82,12 @@ def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int) -> dict
     feedback = {s: [{"title": it["title"][:80], "source": it["source"], "url": it["url"]}
                     for it in feed["items"] if it.get("status") == s][:FEEDBACK_LIMIT]
                 for s in ("ignored", "bought")}
+    # The page is about to be replaced: carry its 무시/샀음 marks into the queue first,
+    # otherwise an ignored deal would still go out in the next digest.
+    marks = {it["id"]: it.get("status") for it in feed["items"]}
+    for p in feed["pending"]:
+        if marks.get(p["id"]) in ("ignored", "bought"):
+            p["status"] = marks[p["id"]]
     known = {b["id"] for b in feed["bought"]}
     carried = [it for it in feed["items"] if it.get("status") == "bought" and it["id"] not in known]
     feed["bought"] = (carried + feed["bought"])[:BOUGHT_LIMIT]

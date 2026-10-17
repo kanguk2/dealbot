@@ -1,4 +1,4 @@
-"""Review the latest run for search-quality problems (CODEX.md step 7).
+"""Review the latest run for search-quality problems (CODEX.md step 6).
 
 Deterministic: reads data/runs.json, feed.json and config.json and reports what went
 wrong or right, with a hint per finding. Codex uses the report to improve

@@ -62,7 +62,7 @@ UI는 저장소 루트에서 `python -m http.server`를 띄우고 `http://localh
 
 ### 1. GitHub Pages 켜기
 
-저장소 **Settings → Pages → Build and deployment**에서 Source를 `Deploy from a branch`, Branch를 `main`, 폴더를 `/docs`로 둔다. 1~2분 뒤 `https://<user>.github.io/dealbot/`에서 열린다.
+저장소 **Settings → Pages → Build and deployment**에서 Source를 `Deploy from a branch`, Branch를 `main`, 폴더는 `/ (root)` 또는 `/docs` 중 아무거나 둔다. 1~2분 뒤 `https://<user>.github.io/dealbot/`에서 열린다. 루트로 두면 루트 `index.html`이 앱(`docs/`)으로 넘겨 준다(현재 설정).
 
 > **공개 저장소 주의**: 이 저장소가 공개면 `data/`의 피드·설정·채널 대상이 누구에게나 보인다. 토큰은 원래 저장소에 없지만, **ntfy 토픽, Telegram chat_id, 이메일 주소도 notifiers.json의 `target`에 넣지 말고** 환경변수(`DEALBOT_NTFY_TOPIC`, `DEALBOT_TELEGRAM_CHAT_ID`, `DEALBOT_EMAIL_TO`)로 넣는다. `target`을 비워 두면 스크립트가 환경변수를 쓴다. 저장소를 비공개로 바꾸면 Pages는 GitHub Pro 이상에서만 동작하고, 피드 화면도 토큰을 넣어야 보인다.
 

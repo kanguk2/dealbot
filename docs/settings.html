@@ -4,16 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>딜봇 설정</title>
+  <meta name="theme-color" content="#f5f8fc">
+  <title>DealBot · 설정</title>
   <link rel="stylesheet" href="style.css">
   <script src="app.js" defer></script>
 </head>
 <body data-page="settings">
-  <header>
-    <h1>딜봇</h1>
-    <nav><a href="./">피드</a><a href="settings.html" aria-current="page">설정</a><a href="guide.html">가이드</a></nav>
+<div class="page-shell">
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="DealBot 홈"><span class="brand-mark">₩</span> DealBot</a>
+    <nav class="site-nav"><a href="./">피드</a><a href="settings.html" aria-current="page">설정</a><a href="guide.html">가이드</a></nav>
   </header>
   <main>
+    <section class="page-title">
+      <p class="section-kicker">SETTINGS</p>
+      <h2>무엇을 찾고, 어디로 알릴지</h2>
+      <p class="form-hint">저장하면 다음 실행부터 반영됩니다. 처음 저장할 때 GitHub 토큰을 한 번 묻습니다.</p>
+    </section>
     <div id="forms"><p class="muted">불러오는 중…</p></div>
 
     <div class="savebar">
@@ -21,5 +28,7 @@
       <div id="result" class="result" aria-live="polite"></div>
     </div>
   </main>
+  <footer><span>DEALBOT © 2026</span><span><a href="guide.html">사용 가이드</a></span></footer>
+</div>
 </body>
 </html>

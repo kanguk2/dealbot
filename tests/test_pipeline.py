@@ -110,6 +110,17 @@ class NotifyScheduleTest(DataDirTest):
         out = self.notify("2026-10-18T09:01:00+09:00", "--dry-run")
         self.assertIn("ntfy daily: 1/1 items", out)
 
+    def test_ignored_mark_survives_feed_replacement_and_stops_digest(self):
+        self.collect([item(1), item(2)], DAY1)
+        self.edit("feed", lambda f: f["items"][0].update(status="ignored"))
+        ignored_id = self.read("feed")["items"][0]["id"]
+        self.collect([item(3)], DAY1_EVE)                 # page replaced before the digest
+        pending = {p["id"]: p.get("status") for p in self.read("feed")["pending"]}
+        self.assertEqual(pending[ignored_id], "ignored")
+        out = self.notify("2026-10-18T09:01:00+09:00", "--dry-run")
+        self.assertIn("ntfy daily: 2/2 items", out)       # item 2 + item 3, not item 1
+        self.assert_valid()
+
     def test_item_that_ended_while_queued_is_not_sent(self):
         self.collect([item(1, ends="2026-10-17"), item(2)], DAY1)
         out = self.notify("2026-10-18T09:01:00+09:00", "--dry-run")

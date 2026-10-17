@@ -233,15 +233,21 @@ function toast(msg, kind = "") {
 
 // ------------------------------------------------------------------ feed page
 // The feed shows only the latest run's results (each Codex run replaces data/feed.json items).
-// The page polls for a newer run and redraws itself.
+// The page polls for a newer run and redraws itself. Layout follows the Flight Watch page:
+// hero with month stats, a "딜 찾기" filter panel, a card grid, and a run-history chart.
 
-const PAGE = 60;
+const PAGE = 40;
 const REFRESH_MS = 3 * 60 * 1000;
 const STATUS_FILTERS = { active: ["new", "seen"], bought: ["bought"], ignored: ["ignored"], all: ["new", "seen", "bought", "ignored"] };
+const SOURCES = {
+  ppomppu: { mark: "뽐", name: "뽐뿌", cls: "ppomppu" },
+  ruliweb: { mark: "루", name: "루리웹", cls: "ruliweb" },
+  search: { mark: "검", name: "웹 검색", cls: "search" },
+  epic_free: { mark: "E", name: "에픽게임즈", cls: "epic" },
+};
 
 /** Local YYYY-MM-DD for "today" comparisons with item.ends. */
-function todayIso() {
-  const d = new Date();
+function todayIso(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
@@ -250,11 +256,97 @@ function visibleItems(items, today = todayIso()) {
   return items.filter((i) => !i.ends || i.ends >= today);
 }
 
+/** Free-text filter over title, summary and source name. */
+function matchesQuery(it, q) {
+  const words = (q || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = `${it.title} ${it.summary || ""} ${sourceInfo(it.source).name}`.toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+
+function sourceInfo(src) {
+  if (!src) return { mark: "?", name: "알 수 없음", cls: "other" };
+  if (SOURCES[src]) return SOURCES[src];
+  if (src.startsWith("rss:")) {
+    const site = src.slice(4).split("_")[0];
+    return SOURCES[site] || { mark: site.slice(0, 1).toUpperCase(), name: sourceLabel(src), cls: "other" };
+  }
+  return { mark: src.slice(0, 1).toUpperCase(), name: src, cls: "other" };
+}
+
+function daysLeft(ends, today = todayIso()) {
+  return Math.round((Date.parse(ends + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000);
+}
+
+/** One deal card (HTML string). Everything user-controlled goes through esc(). */
+function dealCardHtml(it, catName, today = todayIso()) {
+  const s = sourceInfo(it.source);
+  const p = it.price_krw, o = it.original_price_krw, pct = it.discount_pct;
+  let price;
+  if (p === 0) price = `<div class="deal-price"><strong class="free">무료</strong>${o ? `<s>${won(o)}</s>` : ""}</div>`;
+  else if (p != null) price = `<div class="deal-price"><strong>${won(p)}</strong>${pct ? `<span class="pct">-${pct}%</span>` : ""}${o && o > p ? `<s>${won(o)}</s>` : ""}</div>`;
+  else if (pct) price = `<div class="deal-price"><strong>-${pct}%</strong></div>`;
+  else price = `<div class="deal-price unknown"><strong>혜택 내용은 본문 확인</strong></div>`;
+  let due = `<span class="deal-due">마감일 정보 없음</span>`;
+  if (it.ends) {
+    const d = daysLeft(it.ends, today);
+    due = `<span class="deal-due${d <= 2 ? " soon" : ""}">~${mmdd(it.ends)} 마감 · ${d === 0 ? "오늘" : `D-${d}`}</span>`;
+  }
+  return `<article class="deal-card s-${esc(it.status)}" data-id="${esc(it.id)}">
+    <div class="deal-top">
+      <div class="deal-source"><span class="source-logo ${s.cls}">${esc(s.mark)}</span>${esc(s.name)}</div>
+      <a class="deal-arrow" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer" aria-label="원글 열기">↗</a>
+    </div>
+    <p class="deal-kicker">${esc(catName)}${it.status === "new" ? '<span class="badge-new">NEW</span>' : ""}</p>
+    <a class="deal-title" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
+    ${price}
+    ${it.summary ? `<p class="deal-summary">${esc(it.summary)}</p>` : ""}
+    <div class="deal-foot">${due}
+      <div class="deal-actions">
+        <button data-act="bought" class="${it.status === "bought" ? "on" : ""}">샀음</button>
+        <button data-act="ignored" class="${it.status === "ignored" ? "on" : ""}">무시</button>
+      </div>
+    </div>
+  </article>`;
+}
+
+/** Bar chart of new deals per run (oldest -> newest). Runs with errors are drawn in amber. */
+function runChartSvg(runs, count = 14) {
+  const list = ((runs && runs.runs) || []).slice(0, count).reverse();
+  if (!list.length) return '<p class="muted">실행 기록이 쌓이면 여기에 회차별로 잡힌 딜 수가 표시됩니다.</p>';
+  const W = 760, H = 220, left = 40, right = 750, top = 14, bottom = 186;
+  const max = Math.max(4, ...list.map((r) => r.new));
+  const step = (right - left) / list.length;
+  const bw = Math.min(36, step * 0.6);
+  const y = (v) => bottom - (v / max) * (bottom - top);
+  const grid = [0, 0.5, 1].map((f) => {
+    const v = Math.round(max * f), yy = y(v);
+    return `<line class="trend-grid" x1="${left}" x2="${right}" y1="${yy}" y2="${yy}"/><text class="trend-axis" x="${left - 8}" y="${yy + 4}" text-anchor="end">${v}</text>`;
+  }).join("");
+  const bars = list.map((r, i) => {
+    // error runs keep a visible stub even with 0 new deals
+    const x = left + step * i + (step - bw) / 2, h = Math.max(r.errors.length ? 8 : 2, bottom - y(r.new));
+    const label = `${fmtDateTime(r.at)} · 새 딜 ${r.new}건 · 찾음 ${r.found}건${r.errors.length ? ` · 오류 ${r.errors.length}` : ""}`;
+    return `<rect class="trend-bar${r.errors.length ? " err" : ""}" x="${x.toFixed(1)}" y="${(bottom - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="5"><title>${esc(label)}</title></rect>`;
+  }).join("");
+  const first = list[0], last = list[list.length - 1];
+  const axis = `<text class="trend-axis" x="${left}" y="${H - 6}">${esc(fmtDateTime(first.at))}</text>` +
+    (list.length > 1 ? `<text class="trend-axis" x="${right}" y="${H - 6}" text-anchor="end">${esc(fmtDateTime(last.at))}</text>` : "");
+  const total = list.reduce((s, r) => s + r.new, 0);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 ${list.length}회 실행에서 새로 잡힌 딜 수">${grid}${bars}${axis}</svg>
+    <div class="trend-legend"><span><i style="background:var(--brand)"></i>새 딜 수</span><span><i style="background:#f0a020"></i>오류가 있었던 실행</span><span>최근 ${list.length}회 · 합계 ${total}건</span></div>`;
+}
+
+/** "09:00 · 19:00 KST 확인" from config.schedule. */
+function cadenceText(config) {
+  const times = (config && config.schedule && config.schedule.times) || [];
+  return times.length ? `매일 ${times.join(" · ")} KST에 확인` : "실행 시간 미설정";
+}
+
 async function initFeed() {
-  const ui = { cat: "*", status: "active", shown: PAGE };
-  let feed = { run_at: null, items: [], pending: [], bought: [] }, cats = {}, runs = null;
-  const list = document.getElementById("list");
-  const tabs = document.getElementById("cats");
+  const ui = { cat: "*", status: "active", q: "", shown: PAGE };
+  let feed = { run_at: null, items: [], pending: [], bought: [] }, cats = {}, runs = null, config = null;
+  const $ = (id) => document.getElementById(id);
+  const list = $("list");
 
   async function load() {
     const [feedRes, runsRes, cfgRes] = await Promise.allSettled([
@@ -263,19 +355,37 @@ async function initFeed() {
     feed = { run_at: null, items: [], pending: [], bought: [], ...feedRes.value.data };
     runs = runsRes.status === "fulfilled" ? runsRes.value.data : null;
     if (cfgRes.status === "fulfilled") {
+      config = cfgRes.value.data;
       cats = {};
-      for (const c of cfgRes.value.data.categories || []) cats[c.id] = c.name;
+      for (const c of config.categories || []) cats[c.id] = c.name;
     }
-    renderRun(runs, feed);
+    renderRun(runs, feed, config);
     renderStats(feed, runs);
-    drawTabs();
+    fillCategories();
+    $("trend").innerHTML = runChartSvg(runs);
     draw();
   }
 
-  function drawTabs() {
-    const catIds = [...new Set([...Object.keys(cats), ...feed.items.map((i) => i.category)])];
-    tabs.replaceChildren(...[["*", "전체"], ...catIds.map((id) => [id, cats[id] || id])].map(([id, name]) =>
-      h("button", { class: id === ui.cat ? "on" : "", onclick: () => { ui.cat = id; ui.shown = PAGE; draw(); } }, name)));
+  function fillCategories() {
+    const sel = $("cat");
+    const ids = [...new Set([...Object.keys(cats), ...feed.items.map((i) => i.category)])];
+    sel.replaceChildren(h("option", { value: "*" }, "전체"), ...ids.map((id) => h("option", { value: id, selected: id === ui.cat }, cats[id] || id)));
+  }
+
+  async function refresh(manual) {
+    const btn = $("refresh");
+    btn.disabled = true; btn.textContent = "불러오는 중…";
+    const before = runs && runs.runs && runs.runs[0] && runs.runs[0].at;
+    try {
+      await load();
+      const after = runs && runs.runs && runs.runs[0] && runs.runs[0].at;
+      if (after && after !== before && before) toast(`새 실행 결과로 갱신했습니다 (${fmtDateTime(after)})`);
+      else if (manual) toast("최신 상태입니다");
+    } catch (e) {
+      if (manual) toast(`불러오지 못했습니다: ${e.message}`, "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "↻ 게시 데이터 새로고침";
+    }
   }
 
   // Auto refresh: poll the run log; when a newer run landed, reload everything.
@@ -285,18 +395,17 @@ async function initFeed() {
       const latest = (await readFile("data/runs.json")).data;
       const at = latest.runs && latest.runs[0] && latest.runs[0].at;
       const current = runs && runs.runs && runs.runs[0] && runs.runs[0].at;
-      if (at && at !== current) {
-        await load();
-        toast(`새 실행 결과로 갱신했습니다 (${fmtDateTime(at)})`);
-      }
+      if (at && at !== current) await refresh(false);
     } catch (e) { /* offline or rate-limited: try again next tick */ }
   }
   setInterval(checkForUpdate, REFRESH_MS);
   document.addEventListener("visibilitychange", checkForUpdate);
 
-  const statusSel = document.getElementById("status");
-  statusSel.addEventListener("change", () => { ui.status = statusSel.value; ui.shown = PAGE; draw(); });
-  document.getElementById("more").addEventListener("click", () => { ui.shown += PAGE; draw(); });
+  $("refresh").addEventListener("click", () => refresh(true));
+  $("cat").addEventListener("change", (e) => { ui.cat = e.target.value; ui.shown = PAGE; draw(); });
+  $("status").addEventListener("change", (e) => { ui.status = e.target.value; ui.shown = PAGE; draw(); });
+  $("q").addEventListener("input", (e) => { ui.q = e.target.value; ui.shown = PAGE; draw(); });
+  $("more").addEventListener("click", () => { ui.shown += PAGE; draw(); });
 
   list.addEventListener("click", async (ev) => {
     const btn = ev.target.closest("button[data-act]");
@@ -311,6 +420,8 @@ async function initFeed() {
         const target = (data.items || []).find((i) => i.id === id);
         if (!target) throw new Error("새 실행으로 목록이 바뀌었습니다. 새로고침하세요");
         target.status = next;
+        // keep the notification queue in step so 무시 also stops a pending digest
+        for (const p of data.pending || []) if (p.id === id) p.status = next;
       }, `ui: mark ${id} ${next}`);
       toast(next === "bought" ? "샀음으로 표시했습니다" : next === "ignored" ? "무시했습니다" : "표시를 해제했습니다");
       renderStats(feed, runs);
@@ -321,53 +432,52 @@ async function initFeed() {
   });
 
   function draw() {
-    for (const b of tabs.children) b.classList.toggle("on", b.textContent === (ui.cat === "*" ? "전체" : cats[ui.cat] || ui.cat));
     const allowed = STATUS_FILTERS[ui.status];
-    const rows = visibleItems(feed.items).filter((i) => (ui.cat === "*" || i.category === ui.cat) && allowed.includes(i.status));
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const empty = feed.run_at
-      ? `이번 실행(${esc(fmtDateTime(feed.run_at))})에서 새로 잡힌 딜이 없습니다.`
-      : "아직 실행 결과가 없습니다.";
-    list.innerHTML = rows.slice(0, ui.shown).map((it) => {
-      let due = "";
-      if (it.ends) {
-        const days = Math.round((new Date(it.ends + "T00:00:00") - today) / 86400000);
-        due = `<span class="due${days <= 2 ? " soon" : ""}">~${mmdd(it.ends)} (D-${days})</span>`;
-      }
-      const price = priceText(it);
-      return `<article class="card s-${esc(it.status)}" data-id="${esc(it.id)}">
-        <div class="meta">${esc(cats[it.category] || it.category)} · ${esc(sourceLabel(it.source))}${it.status === "new" ? ' <span class="badge">NEW</span>' : ""}</div>
-        <a class="title" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
-        ${price || due ? `<div class="price">${price} ${due}</div>` : ""}
-        ${it.summary ? `<p class="summary">${esc(it.summary)}</p>` : ""}
-        <div class="actions">
-          <button data-act="bought" class="${it.status === "bought" ? "on" : ""}">샀음</button>
-          <button data-act="ignored" class="${it.status === "ignored" ? "on" : ""}">무시</button>
-        </div></article>`;
-    }).join("") || `<p class="empty">${empty}</p>`;
-    document.getElementById("more").hidden = rows.length <= ui.shown;
-    document.getElementById("count").textContent = `${rows.length}건`;
+    const today = todayIso();
+    const rows = visibleItems(feed.items, today).filter((i) =>
+      (ui.cat === "*" || i.category === ui.cat) && allowed.includes(i.status) && matchesQuery(i, ui.q));
+    $("result-count").textContent = `THIS RUN / ${String(rows.length).padStart(2, "0")}`;
+    if (rows.length) {
+      list.innerHTML = rows.slice(0, ui.shown).map((it) => dealCardHtml(it, cats[it.category] || it.category, today)).join("");
+    } else {
+      const filtered = feed.items.length > 0;
+      list.innerHTML = `<div class="empty-state">
+        <h3>${filtered ? "조건에 맞는 딜이 없습니다." : feed.run_at ? "이번 실행에서 새로 잡힌 딜이 없습니다." : "아직 실행 결과가 없습니다."}</h3>
+        <p>${filtered ? "검색어나 분야·상태 필터를 바꿔 보세요."
+          : feed.run_at ? `${esc(fmtDateTime(feed.run_at))} 실행에서 조건에 맞는 새 딜이 없었습니다. 다음 실행 때 자동으로 갱신됩니다. 키워드나 조건을 넓히려면 설정에서 바꾸세요.`
+          : "Codex가 처음 실행되면 이 화면에 결과가 나타납니다. 처음이라면 가이드부터 보세요."}</p>
+        <a class="request-button" href="${filtered || feed.run_at ? "settings.html" : "guide.html"}">${filtered || feed.run_at ? "검색 조건 바꾸기 ↗" : "사용 가이드 보기 ↗"}</a>
+      </div>`;
+    }
+    $("more").hidden = rows.length <= ui.shown;
   }
 
   try { await load(); }
-  catch (e) { list.innerHTML = `<p class="empty">피드를 불러오지 못했습니다: ${esc(e.message)}</p>`; }
+  catch (e) {
+    list.innerHTML = `<div class="empty-state"><h3>피드를 불러오지 못했습니다.</h3><p>${esc(e.message)}</p></div>`;
+    $("refresh-label").textContent = "불러오지 못했습니다";
+  }
 }
 
-function renderRun(runs, feed) {
-  const el = document.getElementById("run");
+function renderRun(runs, feed, config) {
+  const label = document.getElementById("refresh-label");
+  const meta = document.getElementById("run");
   const banner = document.getElementById("banner");
   const last = runs && runs.runs && runs.runs[0];
   banner.hidden = true;
+  if (config) document.getElementById("cadence").textContent =
+    `${cadenceText(config)} · 새로고침은 게시된 결과만 다시 읽으며 사이트를 즉시 검색하지 않습니다.`;
   if (!last) {
-    el.innerHTML = '아직 실행 기록이 없습니다. 처음이라면 <a href="guide.html">가이드</a>부터 보세요.';
-    banner.textContent = "딜봇이 한 번도 실행되지 않았습니다. Codex Automation 설정을 확인하세요.";
+    label.innerHTML = '<span class="status-dot stale"></span>첫 실행 대기';
+    meta.textContent = "";
+    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. Codex Automation 설정을 확인하세요.";
     banner.hidden = false;
     return;
   }
   const hours = (Date.now() - new Date(last.at)) / 3600000;
-  el.innerHTML = `이번 실행 결과 <b>${esc(fmtDateTime(feed.run_at || last.at))}</b> · 새 딜 ${last.new} · 알림 ${last.notified}` +
-    (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "") +
-    ` · <span class="muted">자동 갱신</span>`;
+  label.innerHTML = `<span class="status-dot${hours >= 24 ? " stale" : ""}"></span>최근 실행 ${esc(fmtDateTime(last.at))} KST`;
+  meta.innerHTML = `${esc(fmtDateTime(feed.run_at || last.at))} 실행 · 찾음 ${last.found} · 새 딜 ${last.new} · 알림 ${last.notified}` +
+    (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "");
   if (hours >= 24) {
     banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. Codex Automation 실행 기록을 확인하세요.`;
     banner.hidden = false;
@@ -387,8 +497,10 @@ function monthStats(feed, runs, now = new Date()) {
 
 function renderStats(feed, runs) {
   const s = monthStats(feed, runs);
-  document.getElementById("stats").textContent =
-    `이번 달 ${s.found}건 잡음 · 샀음 ${s.bought}건 · 아낀 금액(추정) ${won(s.saved)}`;
+  document.getElementById("stats").innerHTML =
+    `<div class="stat"><b>${s.found}건</b><span>이번 달 잡은 딜</span></div>` +
+    `<div class="stat"><b>${s.bought}건</b><span>샀음</span></div>` +
+    `<div class="stat"><b>${won(s.saved)}</b><span>아낀 금액(추정)</span></div>`;
 }
 
 // ------------------------------------------------------------------ settings page
