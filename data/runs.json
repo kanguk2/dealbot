@@ -1,6 +1,29 @@
 {
   "runs": [
     {
+      "at": "2026-10-17T14:11:26+09:00",
+      "found": 0,
+      "new": 0,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "Codex 검색 단계 실패 (Actions 로그 확인)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        }
+      ],
+      "by_source": {},
+      "dropped": {},
+      "drop_samples": [],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-17T14:06:09+09:00",
       "found": 15,
       "new": 4,
