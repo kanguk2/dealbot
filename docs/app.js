@@ -66,13 +66,18 @@ async function gh(path, opts = {}) {
 /** Read a repo file as JSON. Returns {data, sha}; sha is null when read without the API. */
 async function readFile(path) {
   if (token()) {
-    const meta = await gh(`contents/${path}?ref=${BRANCH}`);
-    return { data: JSON.parse(b64decode(meta.content)), sha: meta.sha };
+    try {
+      const meta = await gh(`contents/${path}?ref=${BRANCH}`);
+      return { data: JSON.parse(b64decode(meta.content)), sha: meta.sha };
+    } catch (e) {
+      if (e.status !== 401) throw e;
+      store(LS.token, null); // expired or revoked: read anonymously, ask again on the next save
+    }
   }
   // No token: local dev server (repo root) or public raw file.
   const url = isLocal ? `../${path}` : `https://raw.githubusercontent.com/${repo()}/${BRANCH}/${path}?t=${Date.now()}`;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new ApiError(res.status, `${path}: ${res.status} (비공개 저장소라면 설정에서 토큰을 넣으세요)`);
+  if (!res.ok) throw new ApiError(res.status, `${path}: ${res.status}`);
   return { data: await res.json(), sha: null };
 }
 
@@ -87,7 +92,8 @@ async function writeFile(path, data, sha, message) {
  * mutate(data) edits in place (or returns a replacement); returning false skips the write.
  */
 async function updateFile(path, mutate, message) {
-  if (!token()) throw new ApiError(401, "GitHub 토큰이 없습니다. 설정 화면 맨 아래에서 넣어 주세요.");
+  if (!token() && !(await askToken())) throw new ApiError(401, "토큰을 넣지 않아 저장하지 않았습니다.");
+  let reauthed = false;
   for (let attempt = 1; ; attempt++) {
     const { data, sha } = await readFile(path);
     const out = mutate(data);
@@ -98,6 +104,11 @@ async function updateFile(path, mutate, message) {
       return next;
     } catch (e) {
       if (attempt < 2 && (e.status === 409 || e.status === 422)) continue;
+      if (!reauthed && (e.status === 401 || e.status === 403)) {
+        store(LS.token, null);
+        reauthed = true;
+        if (await askToken("저장된 토큰이 만료됐거나 쓰기 권한이 없습니다. 새 토큰을 넣어 주세요.")) { attempt = 0; continue; }
+      }
       throw e;
     }
   }
@@ -379,7 +390,6 @@ function setCheck(arr, value, label) {
 }
 
 async function initSettings() {
-  initTokenBox();
   const main = document.getElementById("forms");
   let cfg, nts, schemas, original;
   try {
@@ -549,21 +559,41 @@ async function initSettings() {
   draw();
 }
 
-function initTokenBox() {
-  const repoIn = document.getElementById("repo");
-  const tokIn = document.getElementById("token");
-  const state = document.getElementById("tokstate");
-  const show = () => { repoIn.value = repo(); state.textContent = token() ? "토큰 저장됨 (이 브라우저에만)" : "토큰 없음: 읽기만 가능"; };
-  document.getElementById("savetoken").addEventListener("click", async () => {
-    if (repoIn.value.trim()) store(LS.repo, repoIn.value.trim());
-    if (tokIn.value.trim()) store(LS.token, tokIn.value.trim());
-    tokIn.value = "";
-    try { await gh(""); toast("저장소 접근 확인됨"); location.reload(); }
-    catch (e) { toast(`확인 실패: ${e.message}`, "error"); }
-    show();
+/**
+ * Ask for the PAT once, the first time something needs to be saved (or after it was rejected).
+ * The token can't ship with the page: Pages is public, so anyone could use it.
+ * Resolves true when a working token is stored, false if the user cancels.
+ */
+function askToken(reason) {
+  return new Promise((resolve) => {
+    const input = h("input", { type: "password", autocomplete: "off", placeholder: "github_pat_…" });
+    const msg = h("p", { class: "muted" });
+    const dlg = h("dialog", { class: "tokdlg" },
+      h("form", { method: "dialog", onsubmit: async (e) => {
+        e.preventDefault();
+        const value = input.value.trim();
+        if (!value) return;
+        store(LS.token, value);
+        msg.textContent = "확인 중…";
+        try {
+          await gh("");
+          dlg.close(); dlg.remove(); resolve(true);
+        } catch (err) {
+          store(LS.token, null);
+          msg.textContent = `토큰을 쓸 수 없습니다: ${err.message}`;
+        }
+      } },
+        h("b", null, "GitHub 저장 권한이 필요합니다"),
+        h("p", null, reason || "변경 내용을 저장소에 커밋하려면 토큰이 한 번 필요합니다. 이 브라우저에만 기억합니다."),
+        h("p", { class: "muted" }, `저장소 ${repo()} · Fine-grained PAT, Contents: Read and write`),
+        input, msg,
+        h("div", { class: "row" },
+          h("button", { type: "submit", class: "primary" }, "확인"),
+          h("button", { type: "button", onclick: () => { dlg.close(); dlg.remove(); resolve(false); } }, "취소"))));
+    document.body.append(dlg);
+    dlg.showModal();
+    input.focus();
   });
-  document.getElementById("cleartoken").addEventListener("click", () => { store(LS.token, null); show(); toast("토큰을 지웠습니다"); });
-  show();
 }
 
 // ------------------------------------------------------------------ boot
