@@ -1,6 +1,35 @@
 {
   "runs": [
     {
+      "at": "2026-10-18T13:16:31+09:00",
+      "found": 3,
+      "new": 2,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "Codex 검색 실행 실패 (.tmp/tick.log)"
+        }
+      ],
+      "by_source": {
+        "rss:ppomppu_coupon": 3
+      },
+      "dropped": {
+        "no_keyword": 1
+      },
+      "drop_samples": [
+        {
+          "title": "[카카오뱅크] 261018 카카오뱅크 Ai 정오 퀴즈( ~ 19시 59분까지)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-18T10:01:40+09:00",
       "found": 13,
       "new": 7,
