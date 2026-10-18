@@ -1,6 +1,73 @@
 {
   "runs": [
     {
+      "at": "2026-10-18T13:47:38+09:00",
+      "found": 51,
+      "new": 41,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:seoul_news": 11,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 25
+      },
+      "dropped": {
+        "no_keyword": 9,
+        "already_seen": 1
+      },
+      "drop_samples": [
+        {
+          "title": "[설명자료] ‘한강버스 리베이트 의혹’ 자체조사, 지방선거 뒤 7월에야 실시 통보",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "은빛 억새부터 라이팅쇼까지…놓치면 아쉬울 하늘공원 '억새축제'",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[설명자료] [단독]서울시 도시철도망 계획 1년 반 늑장…강북횡단선 등 차질 우려",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카드뉴스]남산에 왜 곤돌라가 필요할까?",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "찬 바람 불 때 '뇌졸중' 주의! 전조증상 'F.A.S.T.'를 기억하세요",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "창경궁이 가장 예쁜 시간, 지금이에요! 황홀한 '물빛연화'",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "서울 예비맘 주목! 임신하면 꼭 챙겨야 할 알짜 혜택들(ft. 교통비 지원)",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "청년 마음건강 심리상담, 좋아서 포럼도 다녀왔어요! (ft. 정보퐁퐁)",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "DDP에서 성수동까지, 전시부터 쇼핑까지 ‘서울디자인위크’ 즐기기",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-18T13:16:31+09:00",
       "found": 3,
       "new": 2,
