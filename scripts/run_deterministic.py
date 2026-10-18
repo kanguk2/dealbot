@@ -52,11 +52,25 @@ def drop_report(candidates: list[dict], new: list[dict], rejected: list, dropped
                            "reason": why[:80]} for it, why in samples[:SAMPLE_LIMIT]]
 
 
-def collect(config: dict, since) -> tuple[list[dict], list[dict]]:
+NEW_SOURCE_LOOKBACK_HOURS = 48
+
+
+def source_since(src: str, runs: dict, since, run_at):
+    """Cutoff per source: the last run, or a 48h lookback for a source no recent run has used
+    (a newly added RSS feed would otherwise start empty)."""
+    used = any(src in (r.get("by_source") or {}) or any(e.get("source") == src for e in r.get("errors", []))
+               for r in (runs or {}).get("runs", [])[:10])
+    if used and since is not None:
+        return since
+    return run_at - timedelta(hours=NEW_SOURCE_LOOKBACK_HOURS)
+
+
+def collect(config: dict, since, runs: dict | None = None, run_at=None) -> tuple[list[dict], list[dict]]:
     items, errors = [], []
     for src in enabled_sources(config):
         try:
-            got = fetch_source(config, src, since=since)
+            cutoff = source_since(src, runs, since, run_at) if run_at is not None else since
+            got = fetch_source(config, src, since=cutoff)
             items.extend(got)
             print(f"{src}: {len(got)} candidates", file=sys.stderr)
         except Exception as e:  # noqa: BLE001 - one bad source must not stop the run
@@ -153,7 +167,8 @@ def main() -> int:
     run_at = common.now(config)
     since = common.last_run_at(common.load_data("runs", {}))
 
-    candidates, errors = ([], []) if args.no_sources else collect(config, since)
+    runs_log = common.load_data("runs", {"runs": []})
+    candidates, errors = ([], []) if args.no_sources else collect(config, since, runs_log, run_at)
     if args.extra:
         try:
             candidates.extend(common.read_items(args.extra))

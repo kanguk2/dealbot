@@ -53,6 +53,52 @@
       ]
     },
     {
+      "id": "gov",
+      "name": "정부·지역화폐",
+      "tags": [
+        "서울페이",
+        "지역화폐",
+        "지원금",
+        "정부",
+        "환급",
+        "탄소",
+        "교통",
+        "고향사랑"
+      ],
+      "links": [
+        {
+          "title": "서울페이",
+          "url": "https://www.seoulpay.kr/",
+          "note": "서울사랑상품권·서울페이 이벤트"
+        },
+        {
+          "title": "제로페이",
+          "url": "https://www.zeropay.or.kr/",
+          "note": "지역사랑상품권·제로페이 가맹점"
+        },
+        {
+          "title": "정부24 혜택알리미",
+          "url": "https://www.gov.kr/portal/rcvfvrSvc/main",
+          "note": "내가 받을 수 있는 정부 혜택 조회"
+        },
+        {
+          "title": "고향사랑e음",
+          "url": "https://ilovegohyang.go.kr/",
+          "note": "고향사랑기부 세액공제·답례품"
+        },
+        {
+          "title": "탄소중립포인트",
+          "url": "https://cpoint.or.kr/",
+          "note": "에너지·자동차·녹색생활 포인트"
+        },
+        {
+          "title": "모두의카드 (K-패스)",
+          "url": "https://korea-pass.kr/",
+          "note": "대중교통비 환급"
+        }
+      ]
+    },
+    {
       "id": "hotdeal",
       "name": "핫딜 커뮤니티",
       "tags": [

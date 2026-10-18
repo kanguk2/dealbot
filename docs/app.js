@@ -198,7 +198,7 @@ function h(tag, attrs, ...children) {
 const won = (n) => `${n.toLocaleString("ko-KR")}원`;
 const mmdd = (iso) => (iso ? `${+iso.slice(5, 7)}/${+iso.slice(8, 10)}` : "");
 const SOURCE_LABEL = { epic_free: "에픽", search: "검색" };
-const RSS_LABEL = { ruliweb: "루리웹", ppomppu: "뽐뿌", quasarzone: "퀘이사존", algumon: "알구몬" };
+const RSS_LABEL = { ruliweb: "루리웹", ppomppu: "뽐뿌", quasarzone: "퀘이사존", algumon: "알구몬", seoul: "서울시" };
 
 function sourceLabel(src) {
   if (!src) return "";
@@ -242,6 +242,7 @@ const STATUS_FILTERS = { active: ["new", "seen"], bought: ["bought"], ignored: [
 const SOURCES = {
   ppomppu: { mark: "뽐", name: "뽐뿌", cls: "ppomppu" },
   ruliweb: { mark: "루", name: "루리웹", cls: "ruliweb" },
+  seoul: { mark: "서", name: "내 손안에 서울", cls: "seoul" },
   search: { mark: "검", name: "웹 검색", cls: "search" },
   epic_free: { mark: "E", name: "에픽게임즈", cls: "epic" },
 };
@@ -338,6 +339,13 @@ function runChartSvg(runs, count = 14) {
   const total = list.reduce((s, r) => s + r.new, 0);
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 ${list.length}회 실행에서 새로 잡힌 딜 수">${grid}${bars}${axis}</svg>
     <div class="trend-legend"><span><i style="background:var(--brand)"></i>새 딜 수</span><span><i style="background:#f0a020"></i>오류가 있었던 실행</span><span>최근 ${list.length}회 · 합계 ${total}건</span></div>`;
+}
+
+/** Filter tabs: 전체 + every configured category (+ any category only seen in the feed), with counts. */
+function categoryTabs(cats, items) {
+  const count = (id) => items.filter((i) => id === "*" || i.category === id).length;
+  const ids = [...new Set([...Object.keys(cats), ...items.map((i) => i.category)])];
+  return [{ id: "*", name: "전체", count: count("*") }, ...ids.map((id) => ({ id, name: cats[id] || id, count: count(id) }))];
 }
 
 /** "24시간마다 자동 확인 · 요청하면 바로" from config.schedule.interval_hours. */
@@ -476,9 +484,12 @@ async function initFeed() {
   }
 
   function fillCategories() {
-    const sel = $("cat");
-    const ids = [...new Set([...Object.keys(cats), ...feed.items.map((i) => i.category)])];
-    sel.replaceChildren(h("option", { value: "*" }, "전체"), ...ids.map((id) => h("option", { value: id, selected: id === ui.cat }, cats[id] || id)));
+    const tabs = categoryTabs(cats, visibleItems(feed.items));
+    if (!tabs.some((t) => t.id === ui.cat)) ui.cat = "*";
+    $("cat-tabs").replaceChildren(...tabs.map((t) => h("button", {
+      type: "button", role: "tab", class: `cat-tab${t.id === ui.cat ? " on" : ""}`, "aria-selected": String(t.id === ui.cat),
+      onclick: () => { ui.cat = t.id; ui.shown = PAGE; fillCategories(); draw(); },
+    }, t.name, h("span", { class: "n" }, String(t.count)))));
   }
 
   async function refresh(manual) {
@@ -539,7 +550,6 @@ async function initFeed() {
       toast(`요청 실패: ${e.message}`, "error");
     }
   });
-  $("cat").addEventListener("change", (e) => { ui.cat = e.target.value; ui.shown = PAGE; draw(); });
   $("status").addEventListener("change", (e) => { ui.status = e.target.value; ui.shown = PAGE; draw(); });
   $("q").addEventListener("input", (e) => { ui.q = e.target.value; ui.shown = PAGE; draw(); });
   $("more").addEventListener("click", () => { ui.shown += PAGE; draw(); });
@@ -606,7 +616,7 @@ async function initFeed() {
 
   /** Default view only (no search, no filters): representative or interest-based picks + curated links. */
   function drawPicks(today) {
-    const isDefault = !ui.q.trim() && ui.cat === "*" && ui.status === "active";
+    const isDefault = !ui.q.trim() && ui.cat === "*" && ui.status === "active";  // picks only on the 전체 tab
     $("picks").hidden = !isDefault;
     if (!isDefault) return;
     const onPage = new Set(feed.items.map((i) => i.id));
@@ -792,6 +802,9 @@ async function initSettings() {
       field("키워드", tagInput(cat.keywords, "입력 후 Enter"), "RSS 소스는 키워드가 하나라도 들어간 글만 잡습니다."),
       field("제외어", tagInput(cat.exclude, "입력 후 Enter")),
       field("소스", h("div", { class: "checks" }, opts.map((s) => setCheck(cat.sources, s, sourceName(s))))),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: !!cat.rss_all,
+        onchange: (e) => { if (e.target.checked) cat.rss_all = true; else delete cat.rss_all; } }),
+        "RSS 글 전부 받기 (키워드 검사 안 함, 핫딜 게시판용)"),
       h("div", { class: "row" },
         field("최소 할인율 %", numInput(cat, "min_discount_pct", { min: 0, max: 100, nullable: true })),
         field("최대 가격 (원)", numInput(cat, "max_price_krw", { min: 0, nullable: true }))),

@@ -31,7 +31,8 @@
           "sources": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^(search|[a-z0-9_]+(:[a-z0-9_-]+)?)$" } },
           "min_discount_pct": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
           "max_price_krw": { "type": ["integer", "null"], "minimum": 0 },
-          "priority": { "enum": ["instant", "daily", "weekly"] }
+          "priority": { "enum": ["instant", "daily", "weekly"] },
+          "rss_all": { "type": "boolean" }
         }
       }
     },

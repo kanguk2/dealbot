@@ -33,7 +33,7 @@ TMP = ROOT / ".tmp"
 LOCK = TMP / "tick.lock"
 LOG = TMP / "tick.log"
 LOCK_STALE_S = 2 * 3600
-CODEX_TIMEOUT_S = 25 * 60
+CODEX_TIMEOUT_S = 15 * 60
 NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # no console flashes from the scheduler
 
 
@@ -49,9 +49,10 @@ def log(msg: str) -> None:
 
 def run(cmd: list, timeout: int | None = None) -> subprocess.CompletedProcess:
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    # stdin must be closed: `codex exec` otherwise waits for "additional input" until the timeout
     return subprocess.run([str(c) for c in cmd], cwd=ROOT, env=env, text=True, encoding="utf-8",
                           errors="replace", capture_output=True, timeout=timeout,
-                          creationflags=NO_WINDOW)
+                          stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
 
 
 def find_codex() -> str | None:
@@ -75,7 +76,9 @@ def codex(prompt_file: str, out_file: str, search: bool) -> bool:
     if not exe:
         log("  codex.exe not found (Codex desktop app installed?)")
         return False
-    cmd = [exe, "exec", "--ephemeral", "-C", ROOT, "-s", "workspace-write", "-o", TMP / out_file]
+    # unattended: never wait for an approval prompt
+    cmd = [exe, "exec", "--ephemeral", "-C", ROOT, "-s", "workspace-write",
+           "-c", 'approval_policy="never"', "-o", TMP / out_file]
     if search:
         cmd += ["-c", 'web_search="live"']
     cmd.append((ROOT / prompt_file).read_text(encoding="utf-8"))

@@ -24,17 +24,100 @@
       "min_discount_pct": null,
       "max_price_krw": null,
       "priority": "instant"
+    },
+    {
+      "id": "pay",
+      "name": "결제 할인",
+      "enabled": true,
+      "keywords": [
+        "즉시할인",
+        "결제 할인",
+        "청구할인",
+        "페이 할인",
+        "결제 쿠폰"
+      ],
+      "exclude": [],
+      "sources": [
+        "search"
+      ],
+      "min_discount_pct": null,
+      "max_price_krw": null,
+      "priority": "instant"
+    },
+    {
+      "id": "card",
+      "name": "카드 혜택",
+      "enabled": true,
+      "keywords": [
+        "카드 캐시백",
+        "카드 이벤트",
+        "신규 발급",
+        "카드사 이벤트"
+      ],
+      "exclude": [],
+      "sources": [
+        "search"
+      ],
+      "min_discount_pct": null,
+      "max_price_krw": null,
+      "priority": "instant"
+    },
+    {
+      "id": "gov",
+      "name": "정부·지역화폐",
+      "enabled": true,
+      "keywords": [
+        "서울페이",
+        "지역화폐",
+        "지원금",
+        "상품권",
+        "페이백",
+        "환급",
+        "포인트",
+        "할인",
+        "캐시백",
+        "무료"
+      ],
+      "exclude": [],
+      "sources": [
+        "rss:seoul_news",
+        "search"
+      ],
+      "min_discount_pct": null,
+      "max_price_krw": null,
+      "priority": "instant"
+    },
+    {
+      "id": "hotdeal",
+      "name": "핫딜",
+      "enabled": true,
+      "keywords": [
+        "특가"
+      ],
+      "exclude": [],
+      "sources": [
+        "rss:ppomppu_hotdeal",
+        "rss:ruliweb_hotdeal"
+      ],
+      "min_discount_pct": null,
+      "max_price_krw": null,
+      "priority": "daily",
+      "rss_all": true
     }
   ],
   "rss_feeds": {
     "ppomppu_coupon": "https://www.ppomppu.co.kr/rss.php?id=coupon",
     "ppomppu_hotdeal": "https://www.ppomppu.co.kr/rss.php?id=ppomppu",
-    "ruliweb_hotdeal": "https://bbs.ruliweb.com/market/board/1020/rss"
+    "ruliweb_hotdeal": "https://bbs.ruliweb.com/market/board/1020/rss",
+    "seoul_news": "https://mediahub.seoul.go.kr/news/rss/"
   },
   "search_hints": [
     "뽐뿌 쿠폰게시판",
     "카드사 이벤트",
-    "페이 포인트 적립 이벤트"
+    "페이 포인트 적립 이벤트",
+    "서울페이 이벤트",
+    "지역화폐 할인 판매",
+    "정부 지원금 신청"
   ],
   "quiet_hours": {
     "start": "23:00",

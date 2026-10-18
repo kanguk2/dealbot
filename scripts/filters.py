@@ -2,7 +2,8 @@
 
 Rules, in order:
   - exclude word in title/summary          -> drop
-  - rss:* source and no keyword matches    -> drop (feeds carry every deal; keywords narrow them)
+  - rss:* source and no keyword matches    -> drop (feeds carry every deal; keywords narrow them),
+                                              unless the category sets rss_all (e.g. 핫딜 boards)
   - discount_pct < min_discount_pct        -> drop (unknown discount passes)
   - price_krw > max_price_krw              -> drop (unknown price passes)
   - ends before today                      -> drop (never shown, never notified)
@@ -34,7 +35,7 @@ def reason_to_drop(item: dict, cat: dict, today, min_days_left: int = 0) -> str 
     hit = _has_any(text, cat.get("exclude") or [])
     if hit:
         return f"exclude word '{hit}'"
-    if (item.get("source") or "").startswith("rss:") and cat.get("keywords") \
+    if (item.get("source") or "").startswith("rss:") and not cat.get("rss_all") and cat.get("keywords") \
             and not _has_any(text, cat["keywords"]):
         return "no keyword match"
     min_pct = cat.get("min_discount_pct")
