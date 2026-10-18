@@ -87,8 +87,10 @@ def load_feed() -> dict:
     return {**empty_feed(), **common.load_data("feed", empty_feed())}
 
 
-def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int) -> dict:
-    """The page shows only this run's results; earlier ones are dropped.
+def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int, window_hours: int = 0) -> dict:
+    """The page shows this run's results plus earlier ones from the last `window_hours`
+    (config.schedule.interval_hours), so an on-demand 지금 새로 찾기 run does not wipe the day's
+    list; anything older, ended or 무시 is dropped. window_hours=0 keeps only this run.
     Returns what the user marked on the replaced page (feedback for review_run.py).
 
     - items:   replaced by this run's new deals
@@ -108,7 +110,14 @@ def replace_feed(feed: dict, added: list[dict], run_at, feed_limit: int) -> dict
     known = {b["id"] for b in feed["bought"]}
     carried = [it for it in feed["items"] if it.get("status") == "bought" and it["id"] not in known]
     feed["bought"] = (carried + feed["bought"])[:BOUGHT_LIMIT]
-    feed["items"] = added[:feed_limit]
+    today = run_at.date().isoformat()
+    window = run_at - timedelta(hours=window_hours)
+    ids = {a["id"] for a in added}
+    keep = [it for it in feed["items"]
+            if window_hours and it["id"] not in ids and it.get("status") not in ("ignored", "bought")
+            and (common.parse_dt(it.get("found_at")) or run_at) >= window
+            and not (it.get("ends") and it["ends"] < today)]
+    feed["items"] = (added + keep)[:feed_limit]
     feed["run_at"] = run_at.isoformat()
     cutoff = run_at - timedelta(days=PENDING_DAYS)
     kept = [p for p in feed["pending"]
@@ -136,7 +145,8 @@ def ingest(new_items: list[dict], config: dict, run_at, run_errors: list[dict],
     runs = common.load_data("runs", {"runs": []})
     stamp = run_at.isoformat()
     added = [{**it, "found_at": stamp, "notified": [], "status": "new"} for it in new_items]
-    feedback = replace_feed(feed, added, run_at, config.get("feed_limit", 500))
+    window = int((config.get("schedule") or {}).get("interval_hours", 24))
+    feedback = replace_feed(feed, added, run_at, config.get("feed_limit", 500), window)
     dedupe.prune(seen, config.get("seen_ttl_days", 30), run_at.date())
     dedupe.remember(seen, added, run_at.date())
     run = {"at": stamp, "found": found, "new": len(added), "notified": 0,
