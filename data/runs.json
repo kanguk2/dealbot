@@ -1,6 +1,25 @@
 {
   "runs": [
     {
+      "at": "2026-10-18T14:24:55+09:00",
+      "found": 7,
+      "new": 4,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_hotdeal": 1,
+        "search": 6
+      },
+      "dropped": {
+        "already_seen": 3
+      },
+      "drop_samples": [],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-18T14:10:05+09:00",
       "found": 19,
       "new": 19,
