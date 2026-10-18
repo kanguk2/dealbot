@@ -65,7 +65,7 @@
 | 알림 채널 추가 | `scripts/notifiers/<type>.py`, `notifiers.schema.json`의 type enum, `app.js`의 `CHANNEL_TYPES`, README 시크릿 표, 워크플로 env |
 | 소스 추가 | `scripts/sources/<name>.py`(`fetch(config, arg, since)`), `app.js`의 `sourceOptions`/`sourceName`, README의 Codex 도메인 허용 목록 |
 | 실행 순서 | `CODEX.md`, `.github/workflows/dealbot.yml`, `.github/codex/*.md`, README "자동 실행 연결" |
-| 실행 시간 | Codex 앱 예약 작업 시간(사용자 PC), `data/config.json` `schedule.times`(KST), `dealbot.yml` 안전망 cron(UTC, 1시간 뒤), README |
+| 실행 주기 | `config.schedule.interval_hours`, `scripts/due.py`(PC 기준·안전망 slack), `data/requests.json`(지금 새로 찾기), `docs/app.js` 요청 버튼·설정, `.github/codex/scheduled.md`(SKIP), `dealbot.yml` gate, README |
 | PC 실행 절차 | `.github/codex/scheduled.md`, `scripts/local_run.py`, CODEX.md 머리말, `notify.yml`의 `codex: run` 커밋 메시지 조건 |
 | 사용자 관심사 (`interests.json`) | `docs/app.js` picks·☆ 관심·설정 관심사, `review_run` interest findings, CODEX.md 2·6단계, `.github/codex/search.md` |
 | feed.json 구조 (`items`/`pending`/`bought`) | `run_deterministic.replace_feed`, `notify.run_since`/`prune_pending`, `docs/app.js` 피드·통계, `tests/test_pipeline.py` |
@@ -141,6 +141,7 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - 2026-10-17 · claude/m1-scaffold · PR #1 · M1 뼈대 전체 구현, 게임 카테고리 제외, CLAUDE.md 작성 · Python 파이프라인·ntfy 실전송·UI 렌더링 확인, 다른 채널 실전송은 미검증
 - 2026-10-17 · claude/m1-scaffold · PR #1 · manual-writer 서브에이전트로 MANUAL.md 첫 작성. 서브에이전트가 찾은 문제 수정(ntfy·Pushover·카카오 "외 N건" 누락, 워크플로 env 3개 누락, README 미리보기에 filters.py 누락) · 35건 메시지로 넘침 문구 확인
 - 2026-10-17 · claude/m1-scaffold · PR #1 · 설정에서 GitHub 연결란 제거(첫 저장 때 토큰 대화상자), 피드 실행마다 교체·자동 갱신, 마감 필터(min_days_left), 검색 플레이북 자기개선(review_run.py), 가이드 탭, 테스트 스위트(Python 52·JS 10)와 tests.yml · 뮤테이션 확인으로 테스트가 실제로 잡는 것 확인
+- 2026-10-18 · main · 실행 방식을 "24시간마다 + 피드의 '⚡ 지금 새로 찾기' 요청 시"로 변경(사용자 요청). `config.schedule.interval_hours`, `data/requests.json`, `scripts/due.py`(ran_today.py 대체), Codex 예약 작업은 1시간마다 확인 후 SKIP, Actions 안전망은 3시간마다. 사용자 요청으로 Claude가 직접 웹 검색해 갱신 1회(+7 new, 플레이북 학습 3곳)
 - 2026-10-18 · main · 구독 방식으로 전환: PC Codex 앱 예약 작업 + `local_run.py` + `notify.yml`, `dealbot.yml`은 10:00 안전망. PC에서 prepare→collect→publish를 실제로 돌려 push(+6 new)하고, notify.yml이 자동 실행된 것까지 확인했다. 사용자는 Codex 앱 예약 작업을 아직 만들지 않았다
 - 2026-10-17 · main · 기본 화면 대표/관심 딜 + 모아보기(links.json), ☆ 관심(interests.json) 학습, GitHub Actions `dealbot.yml`(Codex 검색·학습) + `health.yml`, 하루 1회 · test-runner: Python 74·JS 33. 실제 실행 2회: 첫 번째에서 `--search` 오류와 job당 1회 제한을 찾아 job 3개로 분리했다. 두 번째는 흐름은 정상이었지만 OpenAI API `Quota exceeded`(결제·크레딧 필요)로 검색이 안 됐다
 - 2026-10-17 · main · PR 없이 main 직접 push로 전환, test-runner 서브에이전트 추가 · 사용자 요청

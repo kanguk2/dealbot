@@ -1,9 +1,7 @@
 {
   "version": 1,
   "schedule": {
-    "times": [
-      "09:00"
-    ],
+    "interval_hours": 24,
     "timezone": "Asia/Seoul"
   },
   "categories": [

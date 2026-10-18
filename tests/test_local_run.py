@@ -1,4 +1,4 @@
-"""ran_today.py and local_run.py (Codex app scheduled task on the PC).
+"""local_run.py (Codex app scheduled task on the PC).
 
 local_run is exercised against a throwaway git repo (copy of the working tree) whose origin is a
 local bare repo, so nothing is ever pushed to GitHub. Its `sh` is wrapped to add --no-sources to
@@ -14,13 +14,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
 from helpers import ROOT, DataDirTest, item
-
-import ran_today as ran_today_mod
 
 NOW = "2026-10-18T09:05:00+09:00"
 
@@ -30,56 +27,11 @@ def git(cwd, *args, check=True) -> str:
                           encoding="utf-8").stdout
 
 
-# ------------------------------------------------------------------ ran_today
-
-class RanTodayTest(unittest.TestCase):
-    def setUp(self):
-        from zoneinfo import ZoneInfo
-        self.now = datetime(2026, 10, 18, 9, 0, tzinfo=ZoneInfo("Asia/Seoul"))
-
-    def runs(self, at):
-        return {"runs": [{"at": at}]}
-
-    def test_run_earlier_today_counts(self):
-        self.assertTrue(ran_today_mod.ran_today(self.runs("2026-10-18T08:59:00+09:00"), self.now))
-
-    def test_run_yesterday_does_not_count(self):
-        self.assertFalse(ran_today_mod.ran_today(self.runs("2026-10-17T09:00:00+09:00"), self.now))
-
-    def test_empty_history_does_not_count(self):
-        self.assertFalse(ran_today_mod.ran_today({"runs": []}, self.now))
-        self.assertFalse(ran_today_mod.ran_today({}, self.now))
-
-    def test_just_after_local_midnight_is_today(self):
-        self.assertTrue(ran_today_mod.ran_today(self.runs("2026-10-18T00:30:00+09:00"), self.now))
-
-    def test_just_before_local_midnight_is_yesterday(self):
-        self.assertFalse(ran_today_mod.ran_today(self.runs("2026-10-17T23:50:00+09:00"), self.now))
-
-    def test_utc_timestamp_is_compared_in_local_timezone(self):
-        # 2026-10-17 15:30 UTC == 2026-10-18 00:30 KST
-        self.assertTrue(ran_today_mod.ran_today(self.runs("2026-10-17T15:30:00+00:00"), self.now))
-        # 2026-10-17 14:50 UTC == 2026-10-17 23:50 KST
-        self.assertFalse(ran_today_mod.ran_today(self.runs("2026-10-17T14:50:00+00:00"), self.now))
-
-    def test_only_the_latest_run_matters(self):
-        runs = {"runs": [{"at": "2026-10-17T09:00:00+09:00"}, {"at": "2026-10-18T08:00:00+09:00"}]}
-        self.assertFalse(ran_today_mod.ran_today(runs, self.now))
-
-
-class RanTodayCliTest(DataDirTest):
-    def test_cli_prints_yes_after_a_run_today_and_no_otherwise(self):
-        self.assertEqual(self.run_script("ran_today.py", now=NOW).stdout.strip(), "no")
-        self.write("runs", {"runs": [{"at": "2026-10-18T00:30:00+09:00", "found": 0, "new": 0,
-                                       "notified": 0, "by_source": {}, "errors": []}]})
-        self.assertEqual(self.run_script("ran_today.py", now=NOW).stdout.strip(), "yes")
-        self.assertEqual(self.run_script("ran_today.py", now="2026-10-19T00:10:00+09:00").stdout.strip(), "no")
-
-
 # ------------------------------------------------------------------ local_run
 
 def tracked_files() -> list[str]:
-    out = git(ROOT, "ls-files", "-z")
+    # tracked + new (untracked, not ignored) files, so uncommitted new scripts are part of the copy
+    out = git(ROOT, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
     return [p for p in out.split("\0") if p and (ROOT / p).is_file()]
 
 
@@ -301,10 +253,71 @@ class LocalRunTest(unittest.TestCase):
             (other / "data/links.json").read_text(encoding="utf-8") + "\n", encoding="utf-8")
         git(other, "commit", "-q", "-am", "ui: links")
         git(other, "push", "-q", "origin", "main")
-        self.assertEqual(self.call(self.lr.prepare), 0, self.dump())
+        self.assertEqual(self.call(self.lr.prepare, False), 0, self.dump())
+        self.assertIn("RUN 실행 기록 없음", self.dump())
         self.assertFalse((self.lr.TMP / "search.json").exists())
         self.assertFalse((self.lr.TMP / "review.json").exists())
         self.assertEqual(self.head(self.work), self.head(self.remote))
+
+
+    # --- prepare: due.py gate
+    def recent_run(self, at="2026-10-18T08:00:00+09:00"):
+        (self.work / "data/runs.json").write_text(json.dumps({"runs": [
+            {"at": at, "found": 0, "new": 0, "notified": 0, "by_source": {}, "errors": []}]}), encoding="utf-8")
+        git(self.work, "commit", "-q", "-am", "codex: run earlier")
+
+    def last_line(self, prefix):
+        lines = [ln for ln in self.dump().splitlines() if ln.startswith(prefix)]
+        return lines[-1] if lines else None
+
+    def test_prepare_prints_skip_when_a_run_happened_recently(self):
+        self.recent_run()
+        self.search([item(9)])
+        self.assertEqual(self.call(self.lr.prepare, False), 0, self.dump())
+        line = self.last_line("SKIP ")
+        self.assertIsNotNone(line, self.dump())
+        self.assertIn("열린 요청 없음", line)
+        self.assertIsNone(self.last_line("RUN "))
+        self.assertNotIn("ready:", self.dump())
+
+    def test_prepare_force_runs_even_when_not_due(self):
+        self.recent_run()
+        self.search([item(9)])
+        self.assertEqual(self.call(self.lr.prepare, True), 0, self.dump())
+        self.assertEqual(self.last_line("RUN "), "RUN 강제 실행")
+        self.assertIsNone(self.last_line("SKIP "))
+        self.assertFalse((self.lr.TMP / "search.json").exists())
+
+    def test_prepare_runs_after_24h(self):
+        self.recent_run("2026-10-17T09:00:00+09:00")  # NOW is 2026-10-18 09:05
+        self.assertEqual(self.call(self.lr.prepare, False), 0, self.dump())
+        self.assertTrue(self.last_line("RUN 마지막 실행"), self.dump())
+
+    def test_prepare_runs_when_a_request_arrives_with_the_pull(self):
+        self.recent_run()
+        other = self.tmp / "other"
+        git(self.tmp, "clone", "-q", str(self.remote), str(other))
+        git(other, "config", "user.name", "ui")
+        git(other, "config", "user.email", "ui@example.invalid")
+        (other / "data/requests.json").write_text(json.dumps({"requests": [
+            {"id": "r1", "requested_at": "2026-10-18T09:00:00+09:00", "status": "open", "done_at": None}]}),
+            encoding="utf-8")
+        git(other, "add", "-A")
+        git(other, "commit", "-q", "-m", "ui: request run")
+        git(other, "push", "-q", "origin", "main")
+        self.assertEqual(self.call(self.lr.prepare, False), 0, self.dump())
+        self.assertTrue(self.last_line("RUN 페이지 요청"), self.dump())
+
+    def test_request_is_closed_by_collect_and_published(self):
+        (self.work / "data/requests.json").write_text(json.dumps({"requests": [
+            {"id": "r1", "requested_at": "2026-10-18T09:00:00+09:00", "status": "open", "done_at": None}]}),
+            encoding="utf-8")
+        git(self.work, "add", "-A")
+        git(self.work, "commit", "-q", "-m", "ui: request run")
+        self.search([item(1)])
+        self.assertEqual(self.call(self.lr.collect, None), 0, self.dump())
+        self.assertEqual(self.call(self.lr.publish), 0, self.dump())
+        self.assertEqual(self.remote_json("requests")["requests"][0]["status"], "done")
 
 
 class _Sink:
@@ -343,8 +356,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(wf["on"]["push"]["branches"], ["main"])
         self.assertEqual(wf["on"]["push"]["paths"], ["data/runs.json"])
         self.assertIn("workflow_dispatch", wf["on"])
+        # 08:05 KST schedule flushes instant alerts held back by quiet_hours
+        self.assertEqual(wf["on"]["schedule"], [{"cron": "5 23 * * *"}])
         cond = " ".join(wf["jobs"]["notify"]["if"].split())
-        self.assertIn("github.event_name == 'workflow_dispatch'", cond)
+        # push runs only for Codex run commits; schedule and manual runs always run
+        self.assertIn("github.event_name != 'push'", cond)
         self.assertIn("startsWith(github.event.head_commit.message, 'codex: run')", cond)
         runs = [s.get("run", "") for s in wf["jobs"]["notify"]["steps"]]
         self.assertTrue(any("notify.py --since-run" in r for r in runs))
@@ -352,18 +368,38 @@ class WorkflowTest(unittest.TestCase):
     def test_notify_shares_the_data_concurrency_group(self):
         self.assertEqual(self.wf["notify"]["concurrency"]["group"], self.wf["dealbot"]["concurrency"]["group"])
 
-    def test_dealbot_runs_at_10_kst_behind_a_gate(self):
+    def test_dealbot_polls_every_3_hours_behind_a_due_gate(self):
         wf = self.wf["dealbot"]
-        self.assertEqual(wf["on"]["schedule"], [{"cron": "0 1 * * *"}])
+        self.assertEqual(wf["on"]["schedule"], [{"cron": "30 */3 * * *"}])
         jobs = wf["jobs"]
         self.assertEqual(jobs["gate"]["outputs"]["go"], "${{ steps.check.outputs.go }}")
         gate_run = jobs["gate"]["steps"][-1]["run"]
-        self.assertIn("scripts/ran_today.py", gate_run)
+        self.assertIn("scripts/due.py --slack 3 --request-wait 2", gate_run)
+        self.assertIn("pip install", gate_run)  # due.py needs the requirements (tzdata)
         self.assertIn('"schedule"', gate_run)
+        self.assertNotIn("ran_today", gate_run)
         self.assertEqual(jobs["search"]["needs"], "gate")
         self.assertEqual(jobs["search"]["if"], "needs.gate.outputs.go == 'true'")
         self.assertEqual(jobs["collect"]["needs"], ["gate", "search"])
         self.assertEqual(jobs["collect"]["if"], "always() && needs.gate.outputs.go == 'true'")
+
+    def test_gate_decision_follows_the_first_word_of_due_output(self):
+        bash = shutil.which("bash")
+        if not bash or "system32" in bash.lower():
+            self.skipTest("bash not available")
+        gate_run = self.wf["dealbot"]["jobs"]["gate"]["steps"][-1]["run"]
+        for event, out, go in (("schedule", "yes 실행 기록 없음", "true"), ("schedule", "no 다음 자동 실행까지", "false"),
+                               ("workflow_dispatch", "no 다음", "true")):
+            script = (gate_run.replace("${{ github.event_name }}", event)
+                      .replace("pip install -q -r requirements.txt", ":")
+                      .replace("python3 scripts/due.py --slack 3 --request-wait 2", f"echo '{out}'"))
+            with tempfile.TemporaryDirectory() as d:
+                o, summ = Path(d) / "out", Path(d) / "sum"
+                proc = subprocess.run([bash, "-c", script], capture_output=True, text=True, encoding="utf-8",
+                                      env={**os.environ, "GITHUB_OUTPUT": str(o), "GITHUB_STEP_SUMMARY": str(summ)})
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+                self.assertIn(f"go={go}", o.read_text(encoding="utf-8"), (event, out))
+                self.assertIn(out, summ.read_text(encoding="utf-8"))
 
     def test_run_blocks_are_valid_bash(self):
         import re

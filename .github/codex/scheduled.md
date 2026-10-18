@@ -1,7 +1,9 @@
-이 저장소는 개인용 딜 알림 봇이다. 이 작업은 Codex 앱의 예약 작업(ChatGPT 구독)으로 매일 한 번 돈다. 판단이 필요한 두 가지(웹 검색, 플레이북 개선)만 네가 하고, 나머지는 `scripts/local_run.py`가 한다. 자세한 규칙은 `CODEX.md`에 있다.
+이 저장소는 개인용 딜 알림 봇이다. 이 작업은 Codex 앱의 예약 작업(ChatGPT 구독)으로 **1시간마다** 확인한다. 실제로 찾는 건 마지막 실행 후 24시간이 지났거나 사용자가 피드에서 '지금 새로 찾기'를 눌렀을 때뿐이다. 판단이 필요한 두 가지(웹 검색, 플레이북 개선)만 네가 하고, 나머지는 `scripts/local_run.py`가 한다. 자세한 규칙은 `CODEX.md`에 있다.
 
 1. `py -3 scripts/local_run.py prepare`
    - 최신 main을 받고 의존성을 설치한다. Windows에서 `py`가 없으면 `python`을 쓴다.
+   - **출력 마지막 줄이 `SKIP`으로 시작하면 여기서 끝낸다.** 아무 파일도 고치지 않고, "건너뜀: <이유>" 한 줄만 보고한다.
+   - `RUN`으로 시작하면 아래 2단계로 계속한다.
 2. 웹 검색 (CODEX.md 2단계)
    - `data/config.json`, `data/playbook.md`, `data/interests.json`, `data/runs.json`을 읽는다. 기준 시각은 `runs[0].at`이다.
    - 플레이북의 검색어와 관심 키워드부터 웹 검색한다.

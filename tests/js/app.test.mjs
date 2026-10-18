@@ -31,7 +31,7 @@ test("repo is detected from the Pages URL (root or /docs)", () => {
 });
 
 test("committed data passes the schemas in the browser validator", () => {
-  for (const n of ["config", "notifiers", "feed", "seen", "runs", "interests", "links"]) {
+  for (const n of ["config", "notifiers", "feed", "seen", "runs", "interests", "links", "requests"]) {
     assert.deepEqual([...call("validate", json(`schemas/${n}.schema.json`), json(`data/${n}.json`))], [], n);
   }
 });
@@ -40,12 +40,12 @@ test("validator blocks bad settings before saving", () => {
   const cfg = json("data/config.json");
   cfg.categories[0].keywords = [];
   cfg.min_days_left = -1;
-  cfg.schedule.times.push("25:00");
+  cfg.schedule.interval_hours = 0;
   delete cfg.feed_limit;
   const errs = [...call("validate", json("schemas/config.schema.json"), cfg)].join("\n");
   assert.match(errs, /keywords: 최소 1개/);
   assert.match(errs, /min_days_left: 0 이상/);
-  assert.match(errs, /25:00/);
+  assert.match(errs, /interval_hours: 1 이상/);
   assert.match(errs, /feed_limit: 필수/);
 });
 
@@ -183,10 +183,67 @@ test("run chart: latest 14 runs, oldest first, error runs amber, empty message",
   assert.equal(bars[bars.length - 1][1], " err", "newest run (index 0) is drawn last, on the right");
 });
 
-test("cadence text comes from config.schedule.times", () => {
-  assert.equal(call("cadenceText", { schedule: { times: ["09:00", "19:00"] } }), "매일 09:00 · 19:00 KST에 확인");
-  assert.equal(call("cadenceText", json("data/config.json")).startsWith("매일 "), true);
-  assert.equal(call("cadenceText", {}), "실행 시간 미설정");
+test("cadence text comes from config.schedule.interval_hours", () => {
+  assert.equal(call("cadenceText", { schedule: { interval_hours: 6 } }),
+    "6시간마다 자동으로 찾고, '지금 새로 찾기'를 누르면 바로 찾습니다");
+  assert.match(call("cadenceText", json("data/config.json")), /^24시간마다 /);
+  assert.equal(call("cadenceText", {}), "실행 간격 미설정");
+  assert.equal(call("cadenceText", { schedule: { times: ["09:00"] } }), "실행 간격 미설정");
+});
+
+test("schedule schema: interval_hours 1..168 integer, old times field rejected", () => {
+  const schema = json("schemas/config.schema.json");
+  const withSchedule = (schedule) => ({ ...json("data/config.json"), schedule });
+  for (const n of [1, 24, 168]) {
+    assert.deepEqual([...call("validate", schema, withSchedule({ interval_hours: n, timezone: "Asia/Seoul" }))], [], String(n));
+  }
+  for (const n of [0, 169, 2.5]) {
+    assert.ok(call("validate", schema, withSchedule({ interval_hours: n, timezone: "Asia/Seoul" })).length, String(n));
+  }
+  const extra = [...call("validate", schema, withSchedule({ interval_hours: 24, timezone: "Asia/Seoul", times: ["09:00"] }))].join(" | ");
+  assert.match(extra, /times/);
+  const old = [...call("validate", schema, withSchedule({ times: ["09:00"], timezone: "Asia/Seoul" }))].join(" | ");
+  assert.match(old, /interval_hours: 필수/);
+});
+
+// ---- run requests (지금 새로 찾기)
+
+test("localIso writes local time with the UTC offset", () => {
+  const fake = (y, mo, d, hh, mm, ss, offsetMin) => ({
+    getFullYear: () => y, getMonth: () => mo - 1, getDate: () => d, getHours: () => hh,
+    getMinutes: () => mm, getSeconds: () => ss, getTimezoneOffset: () => offsetMin,
+  });
+  assert.equal(call("localIso", fake(2026, 10, 18, 9, 5, 7, -540)), "2026-10-18T09:05:07+09:00");
+  assert.equal(call("localIso", fake(2026, 1, 2, 3, 4, 5, 0)), "2026-01-02T03:04:05+00:00");
+  assert.equal(call("localIso", fake(2026, 12, 31, 23, 59, 59, 300)), "2026-12-31T23:59:59-05:00");
+  assert.equal(call("localIso", fake(2026, 3, 4, 10, 0, 0, -330)), "2026-03-04T10:00:00+05:30");
+  assert.equal(call("localIso", fake(2026, 3, 4, 10, 0, 0, 570)), "2026-03-04T10:00:00-09:30");
+  // a real Date round-trips to the same instant and matches the requests schema pattern
+  const d = new Date(Date.UTC(2026, 9, 18, 1, 2, 3));
+  const iso = call("localIso", d);
+  assert.match(iso, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+  assert.equal(new Date(iso).getTime(), d.getTime());
+});
+
+test("openRequest returns the oldest open request or null", () => {
+  assert.equal(call("openRequest", null), null);
+  assert.equal(call("openRequest", { requests: [] }), null);
+  assert.equal(call("openRequest", {}), null);
+  const done = { id: "a", requested_at: "2026-10-18T08:00:00+09:00", status: "done", done_at: "2026-10-18T09:00:00+09:00" };
+  assert.equal(call("openRequest", { requests: [done] }), null);
+  const o1 = { id: "b", requested_at: "2026-10-18T09:10:00+09:00", status: "open", done_at: null };
+  const o2 = { id: "c", requested_at: "2026-10-18T09:20:00+09:00", status: "open", done_at: null };
+  assert.equal(call("openRequest", { requests: [done, o1, o2] }).id, "b");
+});
+
+test("requestNoteHtml is empty without a request and escapes the time", () => {
+  assert.equal(call("requestNoteHtml", null), "");
+  const html = call("requestNoteHtml", { id: "x", requested_at: "2026-10-18T09:10:00+09:00", status: "open", done_at: null });
+  assert.match(html, /새로 찾기 요청 접수됨/);
+  assert.match(html, /\(\d{1,2}\/\d{1,2} \d{2}:\d{2}\)/);
+  const evil = call("requestNoteHtml", { id: "x", requested_at: "<img src=x onerror=alert(1)>", status: "open", done_at: null });
+  assert.doesNotMatch(evil, /<img/);
+  assert.match(evil, /&lt;img src=x onerror=alert\(1\)&gt;/);
 });
 
 // ---- picks, interests and link collections (default view)

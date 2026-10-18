@@ -1,12 +1,13 @@
 # DealBot fallback / API-key runner.
 #
 # Main path (ChatGPT subscription): a Codex desktop-app scheduled task on the user's PC runs
-# CODEX.md at 09:00 KST (.github/codex/scheduled.md) and pushes "codex: run ..."; notify.yml then
-# sends the notifications. This workflow runs at 10:00 KST and does nothing if a run already
-# happened today (PC was on). If not, it collects the script sources (RSS/Epic) so the day is
-# not lost. With an OPENAI_API_KEY secret (API billing) it also runs Codex here:
+# CODEX.md whenever a run is due (every 24h, or a 지금 새로 찾기 request from the page; the task
+# polls hourly and scripts/due.py decides) and pushes "codex: run ..."; notify.yml then sends the
+# notifications. This workflow polls every 3 hours and only runs when the PC missed a due run by
+# 3h or left a page request open for 2h (PC off). Then it collects the script sources (RSS/Epic).
+# With an OPENAI_API_KEY secret (API billing) it also runs Codex here:
 #
-#   job gate     skip everything when a run already happened today (scheduled runs only)
+#   job gate     scripts/due.py --slack 3 --request-wait 2 (scheduled runs only)
 #   job search   Codex web search (CODEX.md step 2)          -> artifact search.json  [needs OPENAI_API_KEY]
 #   job collect  sources + dedupe + filter + validate + notify + review (steps 3-5)
 #                -> commit data/ and push; artifact review.json
@@ -19,7 +20,7 @@ name: dealbot
 
 on:
   schedule:
-    - cron: "0 1 * * *"   # 10:00 KST: one hour after the Codex app task (config.schedule.times 09:00)
+    - cron: "30 */3 * * *"   # every 3 hours; the gate decides (only when the PC missed a due run or a request)
   workflow_dispatch:
     inputs:
       search:
@@ -51,9 +52,12 @@ jobs:
           persist-credentials: false
       - id: check
         run: |
-          ran=$(python3 scripts/ran_today.py)
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$ran" = "yes" ]; then
-            echo "go=false" >> "$GITHUB_OUTPUT"; echo "오늘 이미 실행됨(Codex 앱) - 건너뜀" >> "$GITHUB_STEP_SUMMARY"
+          pip install -q -r requirements.txt
+          # PC gets the first chance: 3h of slack on the 24h interval, 2h on page requests
+          check=$(python3 scripts/due.py --slack 3 --request-wait 2)
+          echo "$check" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${check%% *}" != "yes" ]; then
+            echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
           fi

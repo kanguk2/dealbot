@@ -70,14 +70,13 @@ class FeedReplaceTest(DataDirTest):
 
 
 class NotifyScheduleTest(DataDirTest):
-    """Pinned here (not the committed default): points is 'daily', runs at 09:00 and 19:00; ntfy takes instant+daily."""
+    """Pinned here (not the committed default): points is 'daily'; ntfy takes instant+daily."""
 
     def setUp(self):
         super().setUp()
 
         def pin(c):
             c["categories"][0]["priority"] = "daily"
-            c["schedule"]["times"] = ["09:00", "19:00"]
         self.edit("config", pin)
 
     def notify(self, now, *extra, env=NTFY):

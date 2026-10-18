@@ -324,3 +324,9 @@ button.add { margin: 6px 0; color: var(--brand-ink); border-style: dashed; }
 .saved-row small { color: var(--faint); }
 .saved-row button { min-height: 28px; padding: 0 10px; }
 #forms > h2#interests { scroll-margin-top: 20px; }
+
+/* run request */
+.refresh-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.refresh-button.primary-soft { background: var(--brand); border-color: var(--brand); color: #fff; }
+.refresh-button.primary-soft:disabled { background: var(--brand-soft); border-color: #c6d9f0; color: var(--brand-ink); opacity: 1; cursor: default; }
+.request-note { margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--brand-soft); color: var(--brand-ink); font-size: 13px; line-height: 1.6; }

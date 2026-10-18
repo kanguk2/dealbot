@@ -11,7 +11,7 @@ import sys
 
 import common
 
-FILES = ("config", "notifiers", "feed", "seen", "runs", "interests", "links")
+FILES = ("config", "notifiers", "feed", "seen", "runs", "interests", "links", "requests")
 
 # Credential-shaped values are never allowed anywhere in data/.
 SECRET_VALUE = re.compile(

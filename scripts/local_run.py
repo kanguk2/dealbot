@@ -4,7 +4,8 @@ The Codex task only does the parts that need judgment (web search, playbook edit
 everything else is one command here. Works with the plain Windows launcher (`py -3`):
 it creates .venv on first use and re-runs itself inside it.
 
-  py -3 scripts/local_run.py prepare   git pull --rebase on main, install deps, make .tmp/
+  py -3 scripts/local_run.py prepare   git pull --rebase on main, install deps, make .tmp/;
+                                       prints "SKIP ..." when no run is due (24h interval, no page request)
   (Codex: web search -> .tmp/search.json)
   py -3 scripts/local_run.py collect   run_deterministic (+ .tmp/search.json), validate, review -> .tmp/review.json
   (Codex: edit data/playbook.md from .tmp/review.json)
@@ -46,11 +47,16 @@ def ensure_venv() -> None:
     sys.exit(subprocess.call([str(VENV_PY), *sys.argv], cwd=ROOT))
 
 
-def prepare() -> int:
+def prepare(force: bool) -> int:
     sh("git", "checkout", "main")
     sh("git", "pull", "--rebase", "--autostash")
     sh(VENV_PY, "-m", "pip", "install", "-q", "-r", "requirements.txt")
     TMP.mkdir(exist_ok=True)
+    check = sh(VENV_PY, "scripts/due.py", capture=True).stdout.strip()
+    if not force and not check.startswith("yes"):
+        print(f"SKIP {check[3:]}")  # the Codex task stops here: nothing to do this time
+        return 0
+    print(f"RUN {check[4:] if check.startswith('yes') else '강제 실행'}")
     for stale in ("search.json", "review.json", "validate_failed"):
         (TMP / stale).unlink(missing_ok=True)
     print("ready: write web-search candidates to .tmp/search.json (JSON array)")
@@ -122,9 +128,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("step", choices=["prepare", "collect", "publish"])
     ap.add_argument("--search-error", help="record why web search could not run")
+    ap.add_argument("--force", action="store_true", help="prepare: run even when nothing is due")
     args = ap.parse_args()
     ensure_venv()
-    return {"prepare": prepare, "collect": lambda: collect(args.search_error),
+    return {"prepare": lambda: prepare(args.force), "collect": lambda: collect(args.search_error),
             "publish": publish}[args.step]()
 
 

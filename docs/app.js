@@ -340,10 +340,35 @@ function runChartSvg(runs, count = 14) {
     <div class="trend-legend"><span><i style="background:var(--brand)"></i>새 딜 수</span><span><i style="background:#f0a020"></i>오류가 있었던 실행</span><span>최근 ${list.length}회 · 합계 ${total}건</span></div>`;
 }
 
-/** "매일 09:00 KST에 확인" from config.schedule. */
+/** "24시간마다 자동 확인 · 요청하면 바로" from config.schedule.interval_hours. */
 function cadenceText(config) {
-  const times = (config && config.schedule && config.schedule.times) || [];
-  return times.length ? `매일 ${times.join(" · ")} KST에 확인` : "실행 시간 미설정";
+  const hours = config && config.schedule && config.schedule.interval_hours;
+  if (hours) return `${hours}시간마다 자동으로 찾고, '지금 새로 찾기'를 누르면 바로 찾습니다`;
+  return "실행 간격 미설정";
+}
+
+// ------------------------------------------------------------------ run requests (지금 새로 찾기)
+// The button appends an open request to data/requests.json. The PC's Codex task polls about hourly
+// and runs when one is open (scripts/due.py); the run closes it. If the PC is off, GitHub Actions
+// picks it up after 2 hours (script sources only).
+
+/** ISO time with the browser's UTC offset, e.g. 2026-10-18T10:05:00+09:00 */
+function localIso(d = new Date()) {
+  const pad = (n) => String(Math.abs(n)).padStart(2, "0");
+  const off = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+    `${off >= 0 ? "+" : "-"}${pad(Math.trunc(off / 60))}:${pad(off % 60)}`;
+}
+
+/** The oldest open request, or null. */
+function openRequest(requests) {
+  const open = ((requests && requests.requests) || []).filter((r) => r.status === "open");
+  return open.length ? open[0] : null;
+}
+
+function requestNoteHtml(req) {
+  if (!req) return "";
+  return `<b>새로 찾기 요청 접수됨</b> (${esc(fmtDateTime(req.requested_at))}) · PC의 Codex가 켜져 있으면 1시간 안에 찾아서 이 화면이 자동으로 바뀝니다. PC가 꺼져 있으면 약 2~3시간 뒤 GitHub가 기본 소스(RSS)만 확인합니다.`;
 }
 
 // ------------------------------------------------------------------ picks & interests
@@ -423,14 +448,14 @@ function linksHtml(groups) {
 async function initFeed() {
   const ui = { cat: "*", status: "active", q: "", shown: PAGE };
   let feed = { run_at: null, items: [], pending: [], bought: [], recent: [] }, cats = {}, runs = null, config = null;
-  let interests = emptyInterests(), linkGroups = [];
+  let interests = emptyInterests(), linkGroups = [], requests = { requests: [] };
   const $ = (id) => document.getElementById(id);
   const list = $("list");
 
   async function load() {
-    const [feedRes, runsRes, cfgRes, intRes, linkRes] = await Promise.allSettled([
+    const [feedRes, runsRes, cfgRes, intRes, linkRes, reqRes] = await Promise.allSettled([
       readFile("data/feed.json"), readFile("data/runs.json"), readFile("data/config.json"),
-      readFile("data/interests.json"), readFile("data/links.json")]);
+      readFile("data/interests.json"), readFile("data/links.json"), readFile("data/requests.json")]);
     if (feedRes.status === "rejected") throw feedRes.reason;
     feed = { run_at: null, items: [], pending: [], bought: [], recent: [], ...feedRes.value.data };
     runs = runsRes.status === "fulfilled" ? runsRes.value.data : null;
@@ -441,6 +466,8 @@ async function initFeed() {
     }
     interests = intRes.status === "fulfilled" ? { ...emptyInterests(), ...intRes.value.data } : emptyInterests();
     linkGroups = linkRes.status === "fulfilled" ? linkRes.value.data.groups || [] : [];
+    requests = reqRes.status === "fulfilled" ? reqRes.value.data : { requests: [] };
+    drawRequest();
     renderRun(runs, feed, config);
     renderStats(feed, runs);
     fillCategories();
@@ -481,9 +508,37 @@ async function initFeed() {
     } catch (e) { /* offline or rate-limited: try again next tick */ }
   }
   setInterval(checkForUpdate, REFRESH_MS);
+  setInterval(() => { if (openRequest(requests)) checkForUpdate(); }, 60 * 1000); // faster while waiting
   document.addEventListener("visibilitychange", checkForUpdate);
 
   $("refresh").addEventListener("click", () => refresh(true));
+
+  function drawRequest() {
+    const req = openRequest(requests);
+    const btn = $("request-run"), note = $("request-note");
+    btn.disabled = !!req;
+    btn.textContent = req ? "⏳ 찾는 중 (요청됨)" : "⚡ 지금 새로 찾기";
+    note.hidden = !req;
+    note.innerHTML = requestNoteHtml(req);
+  }
+
+  $("request-run").addEventListener("click", async () => {
+    const req = { id: `r${Date.now()}`, requested_at: localIso(), status: "open", done_at: null };
+    const prev = requests;
+    requests = { requests: [...(requests.requests || []), req] };
+    drawRequest();
+    try {
+      await updateFile("data/requests.json", (data) => {
+        const list = (data && data.requests) || [];
+        if (openRequest(data)) return false; // someone already asked; nothing to add
+        return { requests: [...list, req].slice(-50) };
+      }, "ui: request run");
+      toast("요청했습니다. 새 결과가 나오면 이 화면이 자동으로 바뀝니다");
+    } catch (e) {
+      requests = prev; drawRequest();
+      toast(`요청 실패: ${e.message}`, "error");
+    }
+  });
   $("cat").addEventListener("change", (e) => { ui.cat = e.target.value; ui.shown = PAGE; draw(); });
   $("status").addEventListener("change", (e) => { ui.status = e.target.value; ui.shown = PAGE; draw(); });
   $("q").addEventListener("input", (e) => { ui.q = e.target.value; ui.shown = PAGE; draw(); });
@@ -618,10 +673,11 @@ function renderRun(runs, feed, config) {
     return;
   }
   const hours = (Date.now() - new Date(last.at)) / 3600000;
-  label.innerHTML = `<span class="status-dot${hours >= 24 ? " stale" : ""}"></span>최근 실행 ${esc(fmtDateTime(last.at))} KST`;
+  label.innerHTML = `<span class="status-dot${hours >= ((config && config.schedule && config.schedule.interval_hours) || 24) + 3 ? " stale" : ""}"></span>최근 실행 ${esc(fmtDateTime(last.at))} KST`;
   meta.innerHTML = `${esc(fmtDateTime(feed.run_at || last.at))} 실행 · 찾음 ${last.found} · 새 딜 ${last.new} · 알림 ${last.notified}` +
     (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "");
-  if (hours >= 24) {
+  const interval = (config && config.schedule && config.schedule.interval_hours) || 24;
+  if (hours >= interval + 3) { // same slack as the Actions fallback (due.py --slack 3)
     banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. PC의 Codex 앱 예약 작업 기록과 GitHub Actions 로그를 확인하세요.`;
     banner.hidden = false;
   }
@@ -706,7 +762,7 @@ function setCheck(arr, value, label) {
 async function initSettings() {
   const main = document.getElementById("forms");
   let cfg, nts, ints, schemas, original;
-  const snapshot = () => ({ config: JSON.stringify(cfg), notifiers: JSON.stringify(nts), interests: JSON.stringify(ints), times: JSON.stringify(cfg.schedule.times) });
+  const snapshot = () => ({ config: JSON.stringify(cfg), notifiers: JSON.stringify(nts), interests: JSON.stringify(ints) });
   try {
     const [c, n, sc, sn, si] = await Promise.all([readFile("data/config.json"), readFile("data/notifiers.json"),
       readFile("schemas/config.schema.json"), readFile("schemas/notifiers.schema.json"), readFile("schemas/interests.schema.json")]);
@@ -761,15 +817,11 @@ async function initSettings() {
   }
 
   function scheduleEditor() {
-    const times = cfg.schedule.times;
     if (!cfg.quiet_hours) cfg.quiet_hours = null;
     const quietOn = !!cfg.quiet_hours;
     return h("div", null,
-      field("실행 시간 (Codex 앱 예약 작업 시간과 맞추세요)", h("div", { class: "times" },
-        times.map((t, i) => h("span", { class: "time" },
-          h("input", { type: "time", value: t, onchange: (e) => (times[i] = e.target.value) }),
-          h("button", { type: "button", "aria-label": "삭제", onclick: () => { times.splice(i, 1); draw(); } }, "×"))),
-        h("button", { type: "button", onclick: () => { times.push("12:00"); draw(); } }, "+"))),
+      field("자동 실행 간격 (시간)", numInput(cfg.schedule, "interval_hours", { min: 1, max: 168 }),
+        "마지막 실행 후 이 시간이 지나면 다음 확인 때 자동으로 찾습니다. 피드의 '지금 새로 찾기'를 누르면 간격과 상관없이 바로 찾습니다. PC의 Codex 앱 예약 작업은 1시간마다 확인하도록 두세요."),
       h("label", { class: "check" }, h("input", { type: "checkbox", checked: quietOn,
         onchange: (e) => { cfg.quiet_hours = e.target.checked ? { start: "23:00", end: "08:00" } : null; draw(); } }), "조용한 시간 (즉시 알림을 다음 실행으로 미룸)"),
       quietOn ? h("div", { class: "row" },
@@ -860,7 +912,6 @@ async function initSettings() {
     const btn = ev.currentTarget;
     const out = document.getElementById("result");
     document.activeElement && document.activeElement.blur(); // flush pending tag input
-    cfg.schedule.times = [...new Set(cfg.schedule.times.filter(Boolean))].sort();
     const errors = [...validate(schemas.config, cfg).map((e) => `config ${e}`),
       ...validate(schemas.notifiers, nts).map((e) => `notifiers ${e}`),
       ...validate(schemas.interests, ints).map((e) => `관심사 ${e}`), ...crossCheck()];
@@ -877,14 +928,10 @@ async function initSettings() {
     btn.disabled = true; out.className = "result"; out.textContent = "저장 중…";
     try {
       // These files belong to the UI (Codex never writes them), so a conflict just retries with the fresh sha.
-      // (snapshot() must run after the jobs: timesChanged below compares against the loaded state.)
       for (const [path, obj, msg] of jobs) await updateFile(path, () => obj, msg);
-      const timesChanged = JSON.stringify(cfg.schedule.times) !== original.times;
       original = snapshot();
       out.className = "result ok";
-      out.replaceChildren(h("b", null, "저장했습니다."), timesChanged
-        ? h("p", null, `실행 시간을 ${cfg.schedule.times.join(", ")}(으)로 바꿨습니다. Codex 앱 예약 작업 시간과 dealbot.yml 안전망 cron(UTC, 1시간 뒤)도 같이 바꾸세요.`)
-        : h("p", null, "실행 시간을 바꿨다면 Codex 앱 예약 작업 시간도 바꾸세요."));
+      out.replaceChildren(h("b", null, "저장했습니다."), h("p", null, "다음 실행부터 반영됩니다."));
       draw();
     } catch (e) {
       out.className = "result error"; out.textContent = `저장 실패: ${e.message}`;

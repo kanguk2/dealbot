@@ -20,6 +20,7 @@ from datetime import timedelta
 
 import common
 import dedupe
+import due
 import filters
 from sources import enabled_sources, fetch_source
 
@@ -131,6 +132,9 @@ def ingest(new_items: list[dict], config: dict, run_at, run_errors: list[dict],
     common.save_data("feed", feed)
     common.save_data("seen", seen)
     common.save_data("runs", runs)
+    requests = common.load_data("requests")
+    if requests is not None and due.close_requests(requests, run_at):  # this run answers 지금 새로 찾기
+        common.save_data("requests", requests)
     return run
 
 

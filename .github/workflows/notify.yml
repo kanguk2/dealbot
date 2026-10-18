@@ -8,6 +8,8 @@ on:
   push:
     branches: [main]
     paths: ["data/runs.json"]
+  schedule:
+    - cron: "5 23 * * *"   # 08:05 KST: send instant alerts held back by quiet_hours (default end 08:00)
   workflow_dispatch:
 
 permissions:
@@ -20,7 +22,7 @@ concurrency:
 jobs:
   notify:
     if: >-
-      github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'codex: run')
+      github.event_name != 'push' || startsWith(github.event.head_commit.message, 'codex: run')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
