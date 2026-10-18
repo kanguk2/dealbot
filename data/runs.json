@@ -5,7 +5,12 @@
       "found": 6,
       "new": 6,
       "notified": 0,
-      "errors": [],
+      "errors": [
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        }
+      ],
       "by_source": {
         "rss:ppomppu_hotdeal": 1,
         "search": 5
