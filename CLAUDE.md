@@ -4,7 +4,8 @@
 
 - 설계 원본: [`SPEC.md`](SPEC.md). 사용자가 작성했고 역할 분담, 스키마, 실행 흐름, 마일스톤이 들어 있다.
 - 사용자용 설치·운영 문서: [`README.md`](README.md)
-- Codex 실행 지침: [`CODEX.md`](CODEX.md). 정기 실행은 **PC의 Codex 앱 예약 작업(ChatGPT 구독)**이 `.github/codex/scheduled.md` + `scripts/local_run.py`로 하고, 알림은 push 후 `notify.yml`, PC가 꺼진 날은 10:00 `dealbot.yml` 안전망이 한다.
+- Codex 실행 지침: [`CODEX.md`](CODEX.md). 정기 실행은 **Windows 작업 스케줄러 "DealBot tick"(15분) → `scripts/codex_tick.py`**가 하고, 할 일이 있을 때만 Codex 앱에 들어 있는 `codex.exe`(ChatGPT 로그인)를 `codex exec`로 부른다. 알림은 push 후 `notify.yml`, PC가 꺼졌을 때는 `dealbot.yml` 안전망(3시간마다 확인)이 한다.
+- **이 PC에서 작업할 때 주의**: "DealBot tick"이 15분마다 같은 작업 폴더에서 돈다. 커밋하지 않은 변경이 있으면 tick은 아무것도 하지 않고 넘어간다. 오래 걸리는 작업 전에 `schtasks /Change /TN "DealBot tick" /DISABLE`, 끝나면 `/ENABLE`.
 - 사용 설명서: [`MANUAL.md`](MANUAL.md). 상황별 사용법이다. `manual-writer` 서브에이전트만 고친다(2절 4번).
 - 서브에이전트: `.claude/agents/manual-writer.md`(설명서), `.claude/agents/test-runner.md`(테스트)
 
@@ -66,7 +67,8 @@
 | 소스 추가 | `scripts/sources/<name>.py`(`fetch(config, arg, since)`), `app.js`의 `sourceOptions`/`sourceName`, README의 Codex 도메인 허용 목록 |
 | 실행 순서 | `CODEX.md`, `.github/workflows/dealbot.yml`, `.github/codex/*.md`, README "자동 실행 연결" |
 | 실행 주기 | `config.schedule.interval_hours`, `scripts/due.py`(PC 기준·안전망 slack), `data/requests.json`(지금 새로 찾기), `docs/app.js` 요청 버튼·설정, `.github/codex/scheduled.md`(SKIP), `dealbot.yml` gate, README |
-| PC 실행 절차 | `.github/codex/scheduled.md`, `scripts/local_run.py`, CODEX.md 머리말, `notify.yml`의 `codex: run` 커밋 메시지 조건 |
+| PC 실행 절차 | `scripts/codex_tick.py`, `scripts/install_tick.ps1`, `scripts/local_run.py`, `.github/codex/search.md`·`review.md`(·`scheduled.md` 대안), CODEX.md 머리말, `notify.yml`의 `codex: run` 커밋 메시지 조건 |
+| 카테고리·소스 기본값 | `data/config.json`(rss_all 포함), `data/links.json`, `data/playbook.md` 검색어, `app.js` SOURCES/RSS_LABEL·탭, README |
 | 사용자 관심사 (`interests.json`) | `docs/app.js` picks·☆ 관심·설정 관심사, `review_run` interest findings, CODEX.md 2·6단계, `.github/codex/search.md` |
 | feed.json 구조 (`items`/`pending`/`bought`) | `run_deterministic.replace_feed`, `notify.run_since`/`prune_pending`, `docs/app.js` 피드·통계, `tests/test_pipeline.py` |
 | 플레이북 섹션·한도 | `data/playbook.md`, `review_run.PLAYBOOK_SECTIONS`/`PLAYBOOK_LIMIT`, CODEX.md 6단계 |
@@ -109,6 +111,13 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - **M1 뼈대** (PR #1 머지됨. 이후로는 main 직접 push): 스키마 5종, 스크립트, 소스 2종, 알림 7종, Pages UI, CODEX.md, README, 백업 워크플로
 
 ### 스펙과 다르게 정한 것 (이유 포함)
+- **Codex 직접 호출 (2026-10-18)**: 사용자 요청("너가 직접 요청 못하나"). Codex 앱에 들어 있는 `codex.exe`가 ChatGPT 로그인 상태라서 `codex exec`가 구독으로 동작한다. 작업 스케줄러 "DealBot tick"이 15분마다 `codex_tick.py`를 돌린다. 지켜야 할 것:
+  - stdin을 닫는다(`DEVNULL`). 열려 있으면 "Reading additional input from stdin"에서 무한 대기한다(25분 타임아웃이 실제로 두 번 났다).
+  - `approval_policy="never"`, 웹 검색은 `-c web_search="live"`.
+  - **사고(2026-10-18 14:09, 14:24)**: pythonw에서 local_run 출력이 사라져 SKIP을 못 읽고 매번 Codex를 실행했다. 그리고 "Codex가 고친 파일 되돌리기"가 사람이 작업 중이던 커밋 전 문서까지 지웠다. 이렇게 고쳤다: 작업 폴더에 커밋 안 된 변경이 있으면 tick을 건너뛴다. 명시적 `RUN` 판정에서만 Codex를 부른다. 콘솔용 `.venv` python으로 local_run을 부른다.
+- **피드 = 최근 interval_hours 안에 잡힌 딜**: '지금 새로 찾기'를 넣으면서 "매번 전부 교체"를 고쳤다. 요청 실행이 그날 목록을 지우지 않게 했다.
+- **카테고리 5개**: 포인트·적립, 결제 할인, 카드 혜택, 정부·지역화폐(내 손안에 서울 RSS + 검색), 핫딜(뽐뿌·루리웹 RSS, `rss_all`, 알림은 daily 묶음). 정책브리핑 RSS는 2026-07에 중단됐다. 새 소스는 첫 실행에서 48시간 전까지 본다.
+- **웹 검색은 진행 중인 이벤트 전체**를 찾는다(올라온 날짜로 거르지 않음). "마지막 실행 이후 글만"으로 했더니 0건이었다.
 - **피드는 실행마다 통째로 교체**: 사용자 선택(2026-10-17). `feed.items`는 최신 실행의 새 딜만 담는다. 묶음 알림은 `feed.pending` 대기열, 샀음 기록은 `feed.bought`(200건)로 남긴다. 이전 페이지의 무시·샀음은 `runs[0].user_feedback`로 넘어가 검색 학습에 쓰인다.
 - **마감 필터**: 사용자 요청. `config.min_days_left`(기본 1)일 이내 마감과 이미 끝난 딜은 수집·표시·알림 모두에서 제외한다. 마감일을 모르면 통과시킨다.
 - **검색 플레이북 자기개선**: 사용자 요청. `data/playbook.md`를 Codex가 매 실행 2단계에서 읽고 6단계에서 `review_run.py` 근거로 최대 3곳 고친다. CODEX.md는 고정 규칙이고, 플레이북이 학습되는 부분이다.
@@ -141,6 +150,7 @@ DEALBOT_NOW=2026-10-18T09:01:00+09:00 DEALBOT_NTFY_TOPIC=x python scripts/notify
 - 2026-10-17 · claude/m1-scaffold · PR #1 · M1 뼈대 전체 구현, 게임 카테고리 제외, CLAUDE.md 작성 · Python 파이프라인·ntfy 실전송·UI 렌더링 확인, 다른 채널 실전송은 미검증
 - 2026-10-17 · claude/m1-scaffold · PR #1 · manual-writer 서브에이전트로 MANUAL.md 첫 작성. 서브에이전트가 찾은 문제 수정(ntfy·Pushover·카카오 "외 N건" 누락, 워크플로 env 3개 누락, README 미리보기에 filters.py 누락) · 35건 메시지로 넘침 문구 확인
 - 2026-10-17 · claude/m1-scaffold · PR #1 · 설정에서 GitHub 연결란 제거(첫 저장 때 토큰 대화상자), 피드 실행마다 교체·자동 갱신, 마감 필터(min_days_left), 검색 플레이북 자기개선(review_run.py), 가이드 탭, 테스트 스위트(Python 52·JS 10)와 tests.yml · 뮤테이션 확인으로 테스트가 실제로 잡는 것 확인
+- 2026-10-18 · main · 작업 스케줄러 + `codex exec`(구독) 직접 호출, 카테고리 5개, 필터 탭, 핫딜·서울 RSS, 정부 링크, 피드 24시간 유지, 검색 규칙 수정. 실제 실행에서 41건 + Codex 검색 5건을 push했다. tick 사고(문서 삭제, 불필요한 Codex 실행 2회)를 test-runner가 발견했고, 작업을 멈춘 뒤 고쳤다
 - 2026-10-18 · main · 실행 방식을 "24시간마다 + 피드의 '⚡ 지금 새로 찾기' 요청 시"로 변경(사용자 요청). `config.schedule.interval_hours`, `data/requests.json`, `scripts/due.py`(ran_today.py 대체), Codex 예약 작업은 1시간마다 확인 후 SKIP, Actions 안전망은 3시간마다. 사용자 요청으로 Claude가 직접 웹 검색해 갱신 1회(+7 new, 플레이북 학습 3곳)
 - 2026-10-18 · main · 구독 방식으로 전환: PC Codex 앱 예약 작업 + `local_run.py` + `notify.yml`, `dealbot.yml`은 10:00 안전망. PC에서 prepare→collect→publish를 실제로 돌려 push(+6 new)하고, notify.yml이 자동 실행된 것까지 확인했다. 사용자는 Codex 앱 예약 작업을 아직 만들지 않았다
 - 2026-10-17 · main · 기본 화면 대표/관심 딜 + 모아보기(links.json), ☆ 관심(interests.json) 학습, GitHub Actions `dealbot.yml`(Codex 검색·학습) + `health.yml`, 하루 1회 · test-runner: Python 74·JS 33. 실제 실행 2회: 첫 번째에서 `--search` 오류와 job당 1회 제한을 찾아 job 3개로 분리했다. 두 번째는 흐름은 정상이었지만 OpenAI API `Quota exceeded`(결제·크레딧 필요)로 검색이 안 됐다

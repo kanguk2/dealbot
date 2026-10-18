@@ -5,7 +5,7 @@
    - **출력 마지막 줄이 `SKIP`으로 시작하면 여기서 끝낸다.** 아무 파일도 고치지 않고, "건너뜀: <이유>" 한 줄만 보고한다.
    - `RUN`으로 시작하면 아래 2단계로 계속한다.
 2. 웹 검색 (CODEX.md 2단계)
-   - `data/config.json`, `data/playbook.md`, `data/interests.json`, `data/runs.json`을 읽는다. 기준 시각은 `runs[0].at`이다.
+   - `data/config.json`, `data/playbook.md`, `data/interests.json`, `data/runs.json`을 읽는다. 지금 진행 중이고 마감 전인 이벤트를 찾는다(올라온 날짜로 거르지 않는다).
    - 플레이북의 검색어와 관심 키워드부터 웹 검색한다.
    - 결과는 `.tmp/search.json`에 JSON 배열로 쓴다. 0건이면 `[]`를 쓴다. 형식은 CODEX.md 2단계와 같다.
    - 모르는 값은 null로 두고 지어내지 않는다. 이미 끝났거나 마감이 config `min_days_left`일 이내인 이벤트는 넣지 않는다.

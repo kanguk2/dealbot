@@ -376,7 +376,7 @@ function openRequest(requests) {
 
 function requestNoteHtml(req) {
   if (!req) return "";
-  return `<b>새로 찾기 요청 접수됨</b> (${esc(fmtDateTime(req.requested_at))}) · PC의 Codex가 켜져 있으면 1시간 안에 찾아서 이 화면이 자동으로 바뀝니다. PC가 꺼져 있으면 약 2~3시간 뒤 GitHub가 기본 소스(RSS)만 확인합니다.`;
+  return `<b>새로 찾기 요청 접수됨</b> (${esc(fmtDateTime(req.requested_at))}) · PC가 켜져 있으면 15분 안에 찾아서 이 화면이 자동으로 바뀝니다. PC가 꺼져 있으면 약 2~3시간 뒤 GitHub가 기본 소스(RSS)만 확인합니다.`;
 }
 
 // ------------------------------------------------------------------ picks & interests
@@ -678,7 +678,7 @@ function renderRun(runs, feed, config) {
   if (!last) {
     label.innerHTML = '<span class="status-dot stale"></span>첫 실행 대기';
     meta.textContent = "";
-    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. PC의 Codex 앱 예약 작업을 만들고 한 번 실행하세요(가이드 참고).";
+    banner.textContent = "딜봇이 아직 한 번도 실행되지 않았습니다. PC에 작업 스케줄러(DealBot tick)를 등록하고 한 번 실행하세요(가이드 참고).";
     banner.hidden = false;
     return;
   }
@@ -688,7 +688,7 @@ function renderRun(runs, feed, config) {
     (last.errors.length ? ` · <span class="err" title="${esc(last.errors.map((e) => `${e.source}: ${e.error}`).join("\n"))}">오류 ${last.errors.length}</span>` : "");
   const interval = (config && config.schedule && config.schedule.interval_hours) || 24;
   if (hours >= interval + 3) { // same slack as the Actions fallback (due.py --slack 3)
-    banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. PC의 Codex 앱 예약 작업 기록과 GitHub Actions 로그를 확인하세요.`;
+    banner.textContent = `딜봇이 ${Math.floor(hours)}시간째 실행되지 않았습니다. PC의 DealBot tick 기록(.tmp/tick.log)과 GitHub Actions 로그를 확인하세요.`;
     banner.hidden = false;
   }
 }
@@ -834,7 +834,7 @@ async function initSettings() {
     const quietOn = !!cfg.quiet_hours;
     return h("div", null,
       field("자동 실행 간격 (시간)", numInput(cfg.schedule, "interval_hours", { min: 1, max: 168 }),
-        "마지막 실행 후 이 시간이 지나면 다음 확인 때 자동으로 찾습니다. 피드의 '지금 새로 찾기'를 누르면 간격과 상관없이 바로 찾습니다. PC의 Codex 앱 예약 작업은 1시간마다 확인하도록 두세요."),
+        "마지막 실행 후 이 시간이 지나면 다음 확인(15분마다) 때 자동으로 찾습니다. 피드의 '지금 새로 찾기'를 누르면 간격과 상관없이 바로 찾습니다."),
       h("label", { class: "check" }, h("input", { type: "checkbox", checked: quietOn,
         onchange: (e) => { cfg.quiet_hours = e.target.checked ? { start: "23:00", end: "08:00" } : null; draw(); } }), "조용한 시간 (즉시 알림을 다음 실행으로 미룸)"),
       quietOn ? h("div", { class: "row" },

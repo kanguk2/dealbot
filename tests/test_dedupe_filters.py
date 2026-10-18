@@ -78,6 +78,27 @@ class FilterTest(unittest.TestCase):
         self.assertEqual(kept, ["그냥 퀴즈 2"])
         self.assertIn("no keyword", why[0])
 
+    def test_rss_all_category_keeps_rss_items_without_keywords(self):
+        cfg = {**CONFIG, "categories": [dict(CONFIG["categories"][0], rss_all=True)]}
+        kept, dropped = filters.apply([dict(item(1, title="그냥 핫딜 노트북", source="rss:x"), id="a"),
+                                       dict(item(2, title="광고 핫딜", source="rss:x"), id="b")], cfg, TODAY)
+        self.assertEqual([k["title"] for k in kept], ["그냥 핫딜 노트북"])
+        self.assertIn("exclude", dropped[0][1])  # rss_all skips keywords only, not exclude words
+
+    def test_rss_all_false_still_needs_a_keyword(self):
+        cfg = {**CONFIG, "categories": [dict(CONFIG["categories"][0], rss_all=False)]}
+        kept, dropped = filters.apply([dict(item(1, title="그냥 핫딜", source="rss:x"), id="a")], cfg, TODAY)
+        self.assertEqual(kept, [])
+        self.assertIn("no keyword", dropped[0][1])
+
+    def test_rss_all_still_applies_discount_and_end_date_limits(self):
+        cfg = {**CONFIG, "categories": [dict(CONFIG["categories"][0], rss_all=True)]}
+        kept, dropped = filters.apply([dict(item(1, title="핫딜", source="rss:x", discount_pct=5), id="a"),
+                                       dict(item(2, title="핫딜2", source="rss:x", ends="2026-10-16"), id="b")],
+                                      cfg, TODAY)
+        self.assertEqual(kept, [])
+        self.assertEqual(len(dropped), 2)
+
     def test_discount_and_price_limits_unknown_passes(self):
         kept, why = self.reasons(item(1, discount_pct=10), item(2, price_krw=60000),
                                  item(3, discount_pct=None, price_krw=None))

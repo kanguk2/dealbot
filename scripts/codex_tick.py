@@ -64,8 +64,14 @@ def find_codex() -> str | None:
     return max(found, key=os.path.getmtime) if found else None  # app updates add a new folder
 
 
+VENV_PY = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
 def local_run(step: str, *extra) -> subprocess.CompletedProcess:
-    proc = run([sys.executable, "scripts/local_run.py", step, *extra])
+    # Always the console python of .venv: under the scheduler sys.executable is pythonw.exe, and
+    # local_run's re-exec from pythonw lost its output, so "SKIP" was never seen (bug 2026-10-18).
+    py = VENV_PY if VENV_PY.exists() else Path(sys.executable)
+    proc = run([py, "scripts/local_run.py", step, *extra])
     for line in (proc.stdout + proc.stderr).strip().splitlines()[-6:]:
         log(f"  [{step}] {line}")
     return proc
@@ -99,21 +105,33 @@ def tracked_changes(allowed: tuple[str, ...]) -> list[str]:
 
 def restore(paths: list[str]) -> None:
     for p in paths:
+        target = ROOT / p
         if run(["git", "ls-files", "--error-unmatch", p]).returncode == 0:
             run(["git", "checkout", "--", p])
+        elif target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
         else:
-            Path(ROOT / p).unlink(missing_ok=True)
+            target.unlink(missing_ok=True)
 
 
 def tick(force: bool, use_codex: bool) -> int:
+    # Never touch work in progress: the restore steps below cannot tell it from Codex's edits
+    # (on 2026-10-18 a tick wiped uncommitted docs). A dirty tree simply waits for the next tick.
+    dirty = tracked_changes((".tmp/", ".venv/"))
+    if dirty:
+        log(f"skip: uncommitted changes in the working tree {dirty[:5]}")
+        return 0
     prep = local_run("prepare", *(["--force"] if force else []))
-    last = (prep.stdout.strip().splitlines() or [""])[-1]
+    lines = prep.stdout.strip().splitlines()
+    verdict = next((l for l in reversed(lines) if l.startswith(("RUN", "SKIP"))), "")
     if prep.returncode != 0:
         log("prepare failed")
         return 1
-    if last.startswith("SKIP"):
+    if not verdict.startswith("RUN"):  # SKIP, or no verdict at all: never spend Codex on doubt
+        if not verdict:
+            log("prepare printed no RUN/SKIP verdict; not running")
         return 0
-    log(f"run: {last}")
+    log(f"run: {verdict}")
 
     search_error = None
     if use_codex:
@@ -133,9 +151,10 @@ def tick(force: bool, use_codex: bool) -> int:
     if use_codex:
         snap = {p: p.read_bytes() for p in (ROOT / "data").glob("*.json")}  # script output
         codex(".github/codex/review.md", "review-report.txt", search=False)
-        stray = tracked_changes((".tmp/", ".venv/", "data/"))
+        stray = [p for p in tracked_changes((".tmp/", ".venv/"))
+                 if p != "data/playbook.md" and (not p.startswith("data/") or Path(ROOT / p) not in snap)]
         if stray:
-            log(f"  discarding Codex edits outside data/: {stray}")
+            log(f"  discarding Codex edits besides data/playbook.md: {stray}")
             restore(stray)
         for path, data in snap.items():  # only data/playbook.md may change in review
             path.write_bytes(data)

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 MAX_MESSAGES = 3
 PRIORITY_LABEL = {"instant": "새 딜", "daily": "어제 모은 딜", "weekly": "지난 주 딜"}
 SOURCE_LABEL = {"epic_free": "에픽", "search": "검색"}
-RSS_LABEL = {"ruliweb": "루리웹", "ppomppu": "뽐뿌", "quasarzone": "퀘이사존", "algumon": "알구몬"}
+RSS_LABEL = {"ruliweb": "루리웹", "ppomppu": "뽐뿌", "quasarzone": "퀘이사존", "algumon": "알구몬", "seoul": "내 손안에 서울"}
 
 
 def source_label(source: str | None) -> str:

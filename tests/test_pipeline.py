@@ -1,6 +1,8 @@
 """End-to-end runs of the CLI scripts against a scratch data dir (no network)."""
 import json
 import unittest
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 from helpers import DataDirTest, item
 
@@ -10,26 +12,78 @@ DAY2 = "2026-10-18T09:00:00+09:00"
 NTFY = {"DEALBOT_NTFY_TOPIC": "test-topic"}
 
 
+def titles(items):
+    return [i["title"] for i in items]
+
+
 class FeedReplaceTest(DataDirTest):
-    def test_each_run_replaces_the_page(self):
+    # config.schedule.interval_hours is 24 by default: the page keeps earlier deals of the last 24h
+    def test_run_within_the_interval_keeps_earlier_items_after_the_new_ones(self):
         run = self.collect([item(1), item(2)], DAY1)
         self.assertEqual((run["found"], run["new"]), (2, 2))
         feed = self.read("feed")
         self.assertEqual(len(feed["items"]), 2)
         self.assertEqual(feed["run_at"], DAY1)
 
-        self.collect([item(1), item(3)], DAY1_EVE)  # item 1 already seen
+        self.collect([item(1), item(3)], DAY1_EVE)  # item 1 already seen, not duplicated
         feed = self.read("feed")
-        self.assertEqual([i["title"] for i in feed["items"]], ["테스트 적립 이벤트 3"])
+        self.assertEqual(titles(feed["items"]), ["테스트 적립 이벤트 3", "테스트 적립 이벤트 1", "테스트 적립 이벤트 2"])
+        self.assertEqual(feed["run_at"], DAY1_EVE)
         self.assertEqual(self.read("runs")["runs"][0]["dropped"], {"already_seen": 1})
         self.assert_valid()
 
-    def test_empty_run_empties_the_page(self):
+    def test_item_found_exactly_24h_ago_is_kept_and_25h_ago_is_dropped(self):
+        self.collect([item(1)], "2026-10-17T08:00:00+09:00")
+        self.collect([item(2)], DAY1)
+        self.collect([item(3)], DAY2)  # item 1 is 25h old, item 2 exactly 24h
+        self.assertEqual(titles(self.read("feed")["items"]), ["테스트 적립 이벤트 3", "테스트 적립 이벤트 2"])
+        self.assert_valid()
+
+    def test_window_follows_config_interval_hours(self):
+        self.edit("config", lambda c: c["schedule"].update(interval_hours=6))
+        self.collect([item(1)], DAY1)
+        self.collect([item(2)], "2026-10-17T15:00:00+09:00")  # 6h: kept
+        self.collect([item(3)], "2026-10-17T20:00:00+09:00")  # item 1 is 11h old, item 2 5h
+        self.assertEqual(titles(self.read("feed")["items"]), ["테스트 적립 이벤트 3", "테스트 적립 이벤트 2"])
+
+    def test_ignored_bought_and_ended_items_leave_the_page_within_the_interval(self):
+        self.edit("config", lambda c: c.update(min_days_left=0))
+        self.collect([item(1), item(2), item(3, ends="2026-10-17"), item(4)], DAY1)
+
+        def mark(feed):
+            feed["items"][0]["status"] = "ignored"
+            feed["items"][1]["status"] = "bought"
+            feed["items"][3]["status"] = "seen"
+        self.edit("feed", mark)
+        self.collect([item(5)], "2026-10-18T08:00:00+09:00")  # 23h later; item 3 ended yesterday
+        feed = self.read("feed")
+        self.assertEqual(titles(feed["items"]), ["테스트 적립 이벤트 5", "테스트 적립 이벤트 4"])
+        self.assertEqual(feed["items"][1]["status"], "seen")  # kept items keep their page mark
+        self.assertEqual(titles(feed["bought"]), ["테스트 적립 이벤트 2"])
+        self.assert_valid()
+
+    def test_empty_run_within_the_interval_keeps_the_page(self):
         self.collect([item(1)], DAY1)
         self.collect([], DAY1_EVE)
         feed = self.read("feed")
-        self.assertEqual(feed["items"], [])
+        self.assertEqual(titles(feed["items"]), ["테스트 적립 이벤트 1"])
         self.assertEqual(feed["run_at"], DAY1_EVE)
+        self.assert_valid()
+
+    def test_empty_run_after_the_interval_empties_the_page(self):
+        self.collect([item(1)], DAY1)
+        self.collect([], "2026-10-18T09:01:00+09:00")
+        feed = self.read("feed")
+        self.assertEqual(feed["items"], [])
+        self.assertEqual(len(feed["recent"]), 1)  # still in the 대표/관심 pool
+        self.assert_valid()
+
+    def test_kept_items_count_towards_feed_limit_new_first(self):
+        self.edit("config", lambda c: c.update(feed_limit=10))
+        self.collect([item(n) for n in range(1, 7)], DAY1)
+        self.collect([item(n) for n in range(7, 13)], DAY1_EVE)
+        self.assertEqual(titles(self.read("feed")["items"]),
+                         [f"테스트 적립 이벤트 {n}" for n in (7, 8, 9, 10, 11, 12, 1, 2, 3, 4)])
         self.assert_valid()
 
     def test_expired_and_too_close_never_reach_the_page(self):
@@ -67,6 +121,97 @@ class FeedReplaceTest(DataDirTest):
         self.write("feed", {"items": []})
         self.collect([item(1)], DAY1)
         self.assertEqual(set(self.read("feed")), {"run_at", "items", "pending", "bought", "recent"})
+
+
+
+class FeedWindowUnitTest(unittest.TestCase):
+    """run_deterministic.replace_feed / source_since called directly."""
+
+    RUN_AT = datetime(2026, 10, 18, 9, 0, tzinfo=timezone(timedelta(hours=9)))
+
+    def page_item(self, n, hours_ago, **over):
+        found = (self.RUN_AT - timedelta(hours=hours_ago)).isoformat()
+        return {**item(n), "id": f"id{n}", "key": f"k{n}", "found_at": found, "notified": [], "status": "new", **over}
+
+    def feed(self, *items):
+        return {"run_at": None, "items": list(items), "pending": [], "bought": [], "recent": []}
+
+    def test_window_keeps_24h_drops_25h_and_puts_new_first(self):
+        import run_deterministic as rd
+        feed = self.feed(self.page_item(1, 24), self.page_item(2, 25), self.page_item(3, 1))
+        rd.replace_feed(feed, [self.page_item(9, 0)], self.RUN_AT, 500, 24)
+        self.assertEqual([i["id"] for i in feed["items"]], ["id9", "id1", "id3"])
+
+    def test_window_drops_ignored_bought_and_ended(self):
+        import run_deterministic as rd
+        feed = self.feed(self.page_item(1, 2, status="ignored"), self.page_item(2, 2, status="bought"),
+                         self.page_item(3, 2, ends="2026-10-17"), self.page_item(4, 2, ends="2026-10-18"))
+        rd.replace_feed(feed, [], self.RUN_AT, 500, 24)
+        self.assertEqual([i["id"] for i in feed["items"]], ["id4"])  # ends today is still open
+        self.assertEqual([b["id"] for b in feed["bought"]], ["id2"])
+
+    def test_window_zero_keeps_only_this_run(self):
+        import run_deterministic as rd
+        feed = self.feed(self.page_item(1, 0), self.page_item(2, 1))
+        rd.replace_feed(feed, [self.page_item(9, 0)], self.RUN_AT, 500, 0)
+        self.assertEqual([i["id"] for i in feed["items"]], ["id9"])
+
+    def test_item_found_again_this_run_is_not_listed_twice(self):
+        import run_deterministic as rd
+        feed = self.feed(self.page_item(1, 2))
+        rd.replace_feed(feed, [self.page_item(1, 0)], self.RUN_AT, 500, 24)
+        self.assertEqual([i["id"] for i in feed["items"]], ["id1"])
+
+    def runs(self, *records):
+        return {"runs": list(records)}
+
+    def test_new_source_gets_a_48h_lookback(self):
+        import run_deterministic as rd
+        last = self.RUN_AT - timedelta(hours=3)
+        runs = self.runs({"at": last.isoformat(), "by_source": {"rss:old": 5}, "errors": []})
+        self.assertEqual(rd.source_since("rss:new", runs, last, self.RUN_AT), self.RUN_AT - timedelta(hours=48))
+
+    def test_source_used_recently_starts_from_the_last_run(self):
+        import run_deterministic as rd
+        last = self.RUN_AT - timedelta(hours=3)
+        runs = self.runs({"at": last.isoformat(), "by_source": {"rss:old": 5}, "errors": []})
+        self.assertEqual(rd.source_since("rss:old", runs, last, self.RUN_AT), last)
+
+    def test_source_that_only_failed_recently_counts_as_used(self):
+        import run_deterministic as rd
+        last = self.RUN_AT - timedelta(hours=3)
+        runs = self.runs({"at": last.isoformat(), "by_source": {}, "errors": [{"source": "rss:old", "error": "x"}]})
+        self.assertEqual(rd.source_since("rss:old", runs, last, self.RUN_AT), last)
+
+    def test_source_seen_only_before_the_last_10_runs_is_new_again(self):
+        import run_deterministic as rd
+        last = self.RUN_AT - timedelta(hours=3)
+        recs = [{"at": last.isoformat(), "by_source": {}, "errors": []} for _ in range(10)]
+        recs.append({"at": "2026-10-01T09:00:00+09:00", "by_source": {"rss:old": 1}, "errors": []})
+        self.assertEqual(rd.source_since("rss:old", self.runs(*recs), last, self.RUN_AT),
+                         self.RUN_AT - timedelta(hours=48))
+        recs[9]["by_source"] = {"rss:old": 1}  # the 10th newest run still counts
+        self.assertEqual(rd.source_since("rss:old", self.runs(*recs), last, self.RUN_AT), last)
+
+    def test_no_run_history_means_48h_lookback(self):
+        import run_deterministic as rd
+        self.assertEqual(rd.source_since("rss:x", {"runs": []}, None, self.RUN_AT),
+                         self.RUN_AT - timedelta(hours=48))
+
+    def test_collect_passes_each_source_its_own_cutoff(self):
+        import run_deterministic as rd
+        last = self.RUN_AT - timedelta(hours=3)
+        runs = self.runs({"at": last.isoformat(), "by_source": {"rss:old": 5}, "errors": []})
+        config = {"categories": [{"id": "points", "enabled": True, "sources": ["rss:old", "rss:new", "search"]}]}
+        cutoffs = {}
+
+        def fake_fetch(cfg, src, since=None):
+            cutoffs[src] = since
+            return []
+        with mock.patch.object(rd, "fetch_source", fake_fetch):
+            items, errors = rd.collect(config, last, runs, self.RUN_AT)
+        self.assertEqual(errors, [])
+        self.assertEqual(cutoffs, {"rss:old": last, "rss:new": self.RUN_AT - timedelta(hours=48)})
 
 
 class NotifyScheduleTest(DataDirTest):

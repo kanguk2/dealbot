@@ -19,13 +19,13 @@ class RecentPoolTest(DataDirTest):
         self.collect([item(1), item(2)], DAY1)
         self.collect([item(3)], DAY1_EVE)
         feed = self.read("feed")
-        self.assertEqual(titles(feed["items"]), ["테스트 적립 이벤트 3"])
+        self.assertEqual(titles(feed["items"]), ["테스트 적립 이벤트 3", "테스트 적립 이벤트 1", "테스트 적립 이벤트 2"])
         self.assertEqual(titles(feed["recent"]), ["테스트 적립 이벤트 3", "테스트 적립 이벤트 1", "테스트 적립 이벤트 2"])
         self.assert_valid()
 
     def test_empty_run_keeps_the_pool(self):
         self.collect([item(1)], DAY1)
-        self.collect([], DAY1_EVE)
+        self.collect([], DAY4)  # past the 24h page window, so the page itself is empty
         feed = self.read("feed")
         self.assertEqual(feed["items"], [])
         self.assertEqual(titles(feed["recent"]), ["테스트 적립 이벤트 1"])

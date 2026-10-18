@@ -394,3 +394,39 @@ test("deal card in picks mode still escapes everything", () => {
     "<i>c</i>", TODAY, { saved: true, marks: false });
   assert.doesNotMatch(html, /<svg|<script|<i>c/);
 });
+
+// ------------------------------------------------------------------ category filter tabs
+
+test("categoryTabs: 전체 first, then configured categories in config order with counts", () => {
+  const cats = { points: "포인트", pay: "결제 할인", card: "카드 혜택", gov: "정부·지역화폐", hotdeal: "핫딜" };
+  const items = [{ category: "hotdeal" }, { category: "points" }, { category: "hotdeal" }, { category: "card" }];
+  assert.deepEqual(plain(call("categoryTabs", cats, items)), [
+    { id: "*", name: "전체", count: 4 },
+    { id: "points", name: "포인트", count: 1 },
+    { id: "pay", name: "결제 할인", count: 0 },
+    { id: "card", name: "카드 혜택", count: 1 },
+    { id: "gov", name: "정부·지역화폐", count: 0 },
+    { id: "hotdeal", name: "핫딜", count: 2 },
+  ]);
+});
+
+test("categoryTabs: a category only in the feed gets a tab named by its id, after the configured ones", () => {
+  const tabs = plain(call("categoryTabs", { points: "포인트" }, [{ category: "game" }, { category: "points" }, { category: "game" }]));
+  assert.deepEqual(tabs.map((t) => [t.id, t.name, t.count]), [["*", "전체", 3], ["points", "포인트", 1], ["game", "game", 2]]);
+});
+
+test("categoryTabs: empty feed still lists 전체 and every category with 0", () => {
+  const tabs = plain(call("categoryTabs", { points: "포인트", pay: "결제 할인" }, []));
+  assert.deepEqual(tabs.map((t) => t.count), [0, 0, 0]);
+  assert.equal(tabs[0].id, "*");
+});
+
+test("categoryTabs: committed config + feed — 전체 equals the sum of category counts", () => {
+  const cfg = json("data/config.json");
+  const cats = Object.fromEntries(cfg.categories.map((c) => [c.id, c.name]));
+  const items = json("data/feed.json").items;
+  const tabs = plain(call("categoryTabs", cats, items));
+  assert.equal(tabs[0].count, items.length);
+  assert.equal(tabs.slice(1).reduce((a, t) => a + t.count, 0), items.length);
+  assert.deepEqual(tabs.slice(1, 1 + cfg.categories.length).map((t) => t.id), cfg.categories.map((c) => c.id));
+});

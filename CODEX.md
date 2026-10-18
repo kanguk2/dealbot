@@ -2,7 +2,7 @@
 
 이 저장소는 개인용 딜 알림 봇이다. Codex는 실행될 때마다 이 문서를 읽고 아래 순서를 **한 번** 수행한다.
 
-> **정기 실행 방식**: PC의 Codex 앱 예약 작업(ChatGPT 구독)이 1시간마다 `.github/codex/scheduled.md`를 따른다. `local_run.py prepare`가 `scripts/due.py`로 할 일이 있는지 본다(24시간 경과 또는 피드의 '지금 새로 찾기' 요청, `data/requests.json`). 없으면 `SKIP`이다. 1·3·4·7단계는 `scripts/local_run.py`(prepare/collect/publish)가 하고, Codex는 2단계 검색과 6단계 플레이북 개선만 한다. 5단계 알림은 push 후 GitHub Actions `notify.yml`이 보낸다. API 키가 있으면 `dealbot.yml`이 Actions 안에서 같은 일을 한다(`.github/codex/search.md`, `review.md`). 사람이 Codex에서 직접 돌릴 때는 아래 전체 순서를 따른다.
+> **정기 실행 방식**: Windows 작업 스케줄러가 15분마다 `scripts/codex_tick.py`를 돌린다. `scripts/due.py`가 할 일을 판단한다(24시간 경과 또는 피드의 '지금 새로 찾기' 요청 `data/requests.json`). 할 일이 있을 때만 Codex CLI(ChatGPT 구독)를 부른다. 2단계는 `.github/codex/search.md`, 6단계는 `.github/codex/review.md`이고, 1·3·4·7단계는 `scripts/local_run.py`가 한다. 5단계 알림은 push 후 GitHub Actions `notify.yml`이 보낸다. 사람이 Codex에서 직접 돌릴 때는 아래 전체 순서를 따른다.
 결정적인 일(수집 스크립트, 중복 판정, 필터, 알림, 검증, 회고 점검)은 전부 `scripts/`가 한다. Codex가 판단할 일은 두 가지다. **2단계 웹 검색**과 **7단계 플레이북 개선**이다.
 
 매 실행마다 피드 페이지는 **그 실행에서 새로 잡힌 딜로 통째로 바뀐다**(이전 결과는 화면에서 사라진다). 아직 보내지 않은 묶음 알림은 `feed.json`의 `pending`에 따로 남아 있으니 신경 쓰지 않아도 된다.
