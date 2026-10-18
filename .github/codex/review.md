@@ -1,4 +1,4 @@
-이 저장소는 개인용 딜 알림 봇이다. 너는 GitHub Actions 안에서 **회고 단계 하나만** 맡는다. 이번 실행의 수집·알림은 이미 끝났다.
+이 저장소는 개인용 딜 알림 봇이다. 너는 자동 실행(PC의 `scripts/codex_tick.py` 또는 GitHub Actions) 안에서 **회고 단계 하나만** 맡는다. 이번 실행의 수집·알림은 이미 끝났다.
 
 1. `CODEX.md`의 "6. 회고: 플레이북 개선"을 읽는다.
 2. `.tmp/review.json`(이번 실행 점검 결과), `data/playbook.md`, `data/interests.json`, `.tmp/search-report.txt`(있으면, 이번 검색 단계 보고)를 읽는다.

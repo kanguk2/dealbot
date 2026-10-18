@@ -1,7 +1,7 @@
-이 저장소는 개인용 딜 알림 봇이다. 너는 GitHub Actions 안에서 **웹 검색 단계 하나만** 맡는다. 나머지 단계(수집 스크립트, 중복 제거, 알림, 커밋)는 워크플로가 직접 한다.
+이 저장소는 개인용 딜 알림 봇이다. 너는 자동 실행(PC의 `scripts/codex_tick.py` 또는 GitHub Actions) 안에서 **웹 검색 단계 하나만** 맡는다. 나머지 단계(수집 스크립트, 중복 제거, 알림, 커밋)는 스크립트가 한다.
 
 1. `CODEX.md`의 "파일 경계", "1. 최신화하고 설정 읽기", "2. 웹 검색"을 읽는다. 1단계의 `git pull`은 하지 않는다(이미 최신이다).
-2. `data/config.json`, `data/playbook.md`, `data/interests.json`, `data/runs.json`(`runs[0].at`이 기준 시각)을 읽는다. 오늘 날짜는 `date` 명령으로 확인한다(KST = UTC+9).
+2. `data/config.json`, `data/playbook.md`, `data/interests.json`, `data/runs.json`(`runs[0].at`이 기준 시각)을 읽는다. 오늘 날짜는 셸 명령(`date` 또는 PowerShell `Get-Date`)으로 확인한다(KST = UTC+9).
 3. 2단계 규칙대로 웹 검색을 하고, 결과를 `.tmp/search.json`에 **JSON 배열**로 쓴다. 0건이면 `[]`를 쓴다.
    - 모르는 값은 null. 지어내지 않는다. url은 실제로 확인한 페이지다.
    - 이미 끝났거나 마감이 config `min_days_left`일 이내인 이벤트는 넣지 않는다.
