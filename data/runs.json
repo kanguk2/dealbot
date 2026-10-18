@@ -9,6 +9,10 @@
         {
           "source": "search",
           "error": "Codex 검색 실행 실패 (.tmp/tick.log)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
         }
       ],
       "by_source": {
