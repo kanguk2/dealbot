@@ -1,6 +1,80 @@
 {
   "runs": [
     {
+      "at": "2026-10-19T13:33:25+09:00",
+      "found": 83,
+      "new": 44,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 18,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 22,
+        "search": 13
+      },
+      "dropped": {
+        "no_keyword": 28,
+        "already_seen": 11
+      },
+      "drop_samples": [
+        {
+          "title": "[네이버페이] 쇼핑라이브 오후 일정 (13시 1개, 18시 2개, 19시 4개, 20시 4개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/19일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[NH올원뱅크]디깅퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[모니모] 오늘의 영어 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[케이뱅크] AI퀴즈 챌린지 - 정답(후보) : 4번",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 클립 챌린지, 편의점, 메디힐, 생활공작소 등 26원 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛! + 우리은행 매일 간식 뽑기",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-18T14:24:55+09:00",
       "found": 7,
       "new": 4,
