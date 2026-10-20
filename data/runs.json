@@ -1,6 +1,80 @@
 {
   "runs": [
     {
+      "at": "2026-10-20T12:48:30+09:00",
+      "found": 81,
+      "new": 49,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 10,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 28,
+        "search": 13
+      },
+      "dropped": {
+        "no_keyword": 20,
+        "already_seen": 12
+      },
+      "drop_samples": [
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/20일자 정답 (& 쇼핑라이브 10시 2개, 11시 1개, 14시 1개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 그린코어 브랜드스토어 알림 100원",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "NH디깅퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 혜택, 연말정산, 페이스사인 3원 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 261020 토스 두근두근 1등 찍기 팀플전(오후투표지수정)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[모니모]오늘의 영어 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛! + 우리은행 매일 간식 뽑기",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-19T13:33:25+09:00",
       "found": 83,
       "new": 44,
