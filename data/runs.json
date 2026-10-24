@@ -1,6 +1,80 @@
 {
   "runs": [
     {
+      "at": "2026-10-24T09:48:15+09:00",
+      "found": 62,
+      "new": 36,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 7,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 18,
+        "search": 7
+      },
+      "dropped": {
+        "no_keyword": 17,
+        "already_seen": 9
+      },
+      "drop_samples": [
+        {
+          "title": "[OK캐쉬백] GS25퀴즈('261024) 리얼그릭복숭아쫀득바",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 네이버 AI탭 20원 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 슬기로운 금융생활 OX퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 축구 play 퀴즈 HANA 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[Hpoint] 퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[모니모] 오늘의 영어 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛! + 우리은행 매일 간식 뽑기",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 261024 토스 두근두근 1등 찍기 팀플전",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB스타뱅킹] 한국사 퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-23T10:33:29+09:00",
       "found": 77,
       "new": 49,
