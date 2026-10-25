@@ -1,6 +1,91 @@
 {
   "runs": [
     {
+      "at": "2026-10-25T14:00:21+09:00",
+      "found": 56,
+      "new": 43,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "Codex 검색 단계 실패 (Actions 로그 확인)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        }
+      ],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 26
+      },
+      "dropped": {
+        "no_keyword": 11,
+        "already_seen": 2
+      },
+      "drop_samples": [
+        {
+          "title": "[네이버페이] 빈폴스토어 알림 100원",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] 261025 카카오뱅크 Ai 정오 퀴즈( ~ 19시 59분까지)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[옥션] 매일 플러스 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/25일자 정답 (& 쇼핑라이브 10시 1개, 11시 2개, 12시 1개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "카카오뱅크 AI",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛! + 우리은행 매일 간식 뽑기",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[버즈빌] 탑텐",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[케이뱅크] AI퀴즈 챌린지",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[신한플레이] 퀴즈팡팡 10/25일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-24T09:48:15+09:00",
       "found": 62,
       "new": 36,
