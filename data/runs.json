@@ -17,6 +17,14 @@
         {
           "source": "notify:ntfy",
           "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
         }
       ],
       "by_source": {
