@@ -1,6 +1,80 @@
 {
   "runs": [
     {
+      "at": "2026-10-27T15:36:08+09:00",
+      "found": 82,
+      "new": 48,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 15,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 28,
+        "search": 9
+      },
+      "dropped": {
+        "no_keyword": 20,
+        "already_seen": 14
+      },
+      "drop_samples": [
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/27일자 정답 (& 쇼핑라이브 12시 1개, 13시 1개, 19시 5개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[NH올원뱅크]디깅퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[네이버페이] 삼성전자, 해외여행, 마이카 등 23원 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 261027 토스 두근두근 1등 찍기 팀플전",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛! + 우리은행 매일 간식 뽑기",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[케이뱅크] AI퀴즈 챌린지",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "지하철 7호선, 의정부·양주를 지나 포천까지! 도봉산-옥정 연장선",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-26T14:49:21+09:00",
       "found": 66,
       "new": 48,
