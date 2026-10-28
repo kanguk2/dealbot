@@ -1,6 +1,80 @@
 {
   "runs": [
     {
+      "at": "2026-10-28T17:18:58+09:00",
+      "found": 84,
+      "new": 51,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 17,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 28,
+        "search": 9
+      },
+      "dropped": {
+        "no_keyword": 21,
+        "already_seen": 12
+      },
+      "drop_samples": [
+        {
+          "title": "[네이버페이] 쇼핑라이브 오후 & 지난 방송 24원 (14시 4개, 18시 1개, 19시 6개, 20시 6개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 오후 1시 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스퀴즈]정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/28일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] OX퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 축구 play 퀴즈 HANA",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[NH올원뱅크]디깅퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P) + 랜덤박스",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-27T15:36:08+09:00",
       "found": 82,
       "new": 48,
