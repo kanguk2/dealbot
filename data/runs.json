@@ -1,6 +1,80 @@
 {
   "runs": [
     {
+      "at": "2026-10-30T15:48:39+09:00",
+      "found": 72,
+      "new": 50,
+      "notified": 0,
+      "errors": [],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 12,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 28,
+        "search": 2
+      },
+      "dropped": {
+        "no_keyword": 18,
+        "already_seen": 4
+      },
+      "drop_samples": [
+        {
+          "title": "[네이버페이] 쇼핑라이브 오후 & 지난 방송 6원 (14시 1개, 19시 1개, 20시 1개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[요기요] NPAY 전용(최대 5000원) 쿠폰 받으세요",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 10/30일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 현대아울렛 슈퍼위켄드",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[NH올원뱅크]디깅퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "전원 메가 아이스 아메리카노 즉시 발송) 티머니GO 가입",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[버즈빌] 하림펫푸드",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-29T16:34:20+09:00",
       "found": 79,
       "new": 49,
