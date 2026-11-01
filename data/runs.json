@@ -1,6 +1,87 @@
 {
   "runs": [
     {
+      "at": "2026-11-02T01:11:15+09:00",
+      "found": 58,
+      "new": 44,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "Codex 검색 단계 실패 (Actions 로그 확인)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        }
+      ],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 28
+      },
+      "dropped": {
+        "no_keyword": 13,
+        "already_seen": 1
+      },
+      "drop_samples": [
+        {
+          "title": "[버즈빌] 탑텐",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[케이뱅크] AI퀴즈 챌린지",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛!",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 261102 토스 두근두근 1등 찍기 팀플전",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[NH올원뱅크]디깅퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 슬기로운 금융생활 OX퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] OX 퀴즈 11/2 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나원큐] 축구 play 퀴즈 HANA 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[Hpoint] 퀴즈 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[신한쏠] 야구상식 쏠퀴즈 11/2일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      }
+    },
+    {
       "at": "2026-10-31T15:03:54+09:00",
       "found": 59,
       "new": 46,
