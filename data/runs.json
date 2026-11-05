@@ -1,6 +1,99 @@
 {
   "runs": [
     {
+      "at": "2026-11-05T20:16:35+09:00",
+      "found": 78,
+      "new": 52,
+      "notified": 0,
+      "errors": [
+        {
+          "source": "search",
+          "error": "Codex 검색 단계 실패 (Actions 로그 확인)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        },
+        {
+          "source": "notify:ntfy",
+          "error": "환경변수 없음: DEALBOT_NTFY_TOPIC (또는 notifiers.json target)"
+        }
+      ],
+      "by_source": {
+        "rss:ppomppu_coupon": 15,
+        "rss:seoul_news": 20,
+        "rss:ppomppu_hotdeal": 15,
+        "rss:ruliweb_hotdeal": 28
+      },
+      "dropped": {
+        "no_keyword": 24,
+        "already_seen": 2
+      },
+      "drop_samples": [
+        {
+          "title": "[네이버페이] 쇼핑라이브 저녁 & 지난 라이브 13원 (18시 2개, 19시 4개, 20시 2개)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오뱅크] AI 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[카카오페이] 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[토스] 퀴즈 정답 !",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[KB Pay] 오늘의 퀴즈 11/5일자 정답",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[모니모] 오늘의 영어 퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[하나Pay] 트래블 미션 (매일 5P)",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[슈퍼SOL] 오늘도 돌려요! 100% 당첨 룰렛!",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "NH 디깅퀴즈",
+          "source": "rss:ppomppu_coupon",
+          "reason": "no keyword match"
+        },
+        {
+          "title": "[서울시 팩트브리핑] 신속통합기획 재개발 권리산정기준일은 지역 여건 등을 고려, 구청장이 후보지를 추천하는 날을 기준일로 지정합니다.",
+          "source": "rss:seoul_news",
+          "reason": "no keyword match"
+        }
+      ],
+      "user_feedback": {
+        "ignored": [],
+        "bought": []
+      },
+      "alerts": [
+        "source_fail:search"
+      ]
+    },
+    {
       "at": "2026-11-04T10:31:12+09:00",
       "found": 69,
       "new": 45,
